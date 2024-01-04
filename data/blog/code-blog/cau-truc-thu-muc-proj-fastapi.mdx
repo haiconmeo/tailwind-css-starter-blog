@@ -1,0 +1,40 @@
+---
+title: 'Cấu Trúc thư mục dự án fastapi của tôi'
+date: '2023-01-04'
+tags: ['fastapi', 'python', 'backend']
+draft: true
+summary: FastAPI là một framework hiện đại, nhanh chóng và dễ sử dụng, dựa trên tiêu chuẩn Python 3.6 trở lên. Nó được thiết kế để dễ dàng xây dựng API với hiệu suất cao, và nó cung cấp một giao diện người dùng tương tác tốt..
+---
+
+
+
+## Introduction
+
+FastAPI là một framework hiện đại, nhanh chóng và dễ sử dụng, dựa trên tiêu chuẩn Python 3.6 trở lên. Nó được thiết kế để dễ dàng xây dựng API với hiệu suất cao, và nó cung cấp một giao diện người dùng tương tác tốt. Trong bài viết này, chúng tôi sẽ giới thiệu về FastAPI, cách cài đặt, cung cấp một số code mẫu và hướng dẫn bạn viết chương trình đầu tiên.
+
+Đầu tiên, để cài đặt FastAPI, bạn cần có Python 3.6 trở lên. Sau đó, bạn có thể cài đặt FastAPI bằng cách sử dụng pip, một trình quản lý gói Python. Dưới đây là câu lệnh cài đặt:
+
+```
+pip install fastapi
+```
+
+Sau khi cài đặt FastAPI, bạn có thể bắt đầu viết chương trình đầu tiên của mình. Dưới đây là một ví dụ về chương trình đơn giản sử dụng FastAPI:
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+```
+
+Trong đoạn code trên, chúng tôi đã tạo một ứng dụng FastAPI và định nghĩa một route tại đường dẫn "/". Khi bạn truy cập vào đường dẫn này, nó sẽ trả về một đối tượng JSON với nội dung "Hello: World".
+
+FastAPI cung cấp nhiều tính năng mạnh mẽ khác như hỗ trợ cho việc xây dựng API RESTful, hỗ trợ cho việc xây dựng ứng dụng web với giao diện người dùng tương tác, và nhiều hơn nữa. Nếu bạn muốn tìm hiểu thêm về FastAPI, hãy xem video giới thiệu về FastAPI trên kênh Youtube của chúng tôi.
+
+Nguồn tham khảo:
+1. FastAPI Documentation: https://fastapi.tiangolo.com/
+2. Python Documentation: https://docs.python.org/3/
+3. Youtube Video: [Link to the video]
