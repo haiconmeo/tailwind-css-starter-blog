@@ -8,33 +8,73 @@ summary: FastAPI là một framework hiện đại, nhanh chóng và dễ sử d
 
 
 
-## Introduction
+# Cấu Trúc Thư Mục Của Project Back End Sử Dụng FastAPI
 
-FastAPI là một framework hiện đại, nhanh chóng và dễ sử dụng, dựa trên tiêu chuẩn Python 3.6 trở lên. Nó được thiết kế để dễ dàng xây dựng API với hiệu suất cao, và nó cung cấp một giao diện người dùng tương tác tốt. Trong bài viết này, chúng tôi sẽ giới thiệu về FastAPI, cách cài đặt, cung cấp một số code mẫu và hướng dẫn bạn viết chương trình đầu tiên.
+FastAPI là một framework hiện đại, nhanh chóng (high-performance), dễ học, nhanh để viết code, sẵn sàng cho sản xuất, dựa trên tiêu chuẩn Python 3.6 type hints.
 
-Đầu tiên, để cài đặt FastAPI, bạn cần có Python 3.6 trở lên. Sau đó, bạn có thể cài đặt FastAPI bằng cách sử dụng pip, một trình quản lý gói Python. Dưới đây là câu lệnh cài đặt:
+Dưới đây là một ví dụ về cấu trúc thư mục cho một dự án back end sử dụng FastAPI:
+
+Một số thư viện tôi thường dùng trong việc sử dụng fastapi
+1. pydantic 2.: đây là 1 thư viện validate data của request hay response (từ v2 code bằng rust nên tốc độ khỏ bàn)
+2. sqlalchemy: đây là thư viện orm 
+3. jinja2: một bộ thư viện giúp render HTML
+4. poetry: nó giống như npm của node vậy, đôi khi hơi sida trên win
 
 ```
-pip install fastapi
+📦myproject
+ ┣ 📂app
+ ┃ ┣ 📂api
+ ┃ ┃ ┣ 📂endpoints
+ ┃ ┃ ┃ ┣ 📜user.py
+ ┃ ┃ ┃ ┗ 📜item.py
+ ┃ ┃ ┗ 📜api.py
+ ┃ ┃ ┗ 📜deps.py
+ ┃ ┣ 📂core
+ ┃ ┃ ┣ 📜config.py
+ ┃ ┃ ┗ 📜security.py
+ ┃ ┣ 📂models
+ ┃ ┃ ┣ 📜user.py
+ ┃ ┃ ┗ 📜item.py
+ ┃ ┣ 📂schemas
+ ┃ ┃ ┣ 📜user.py
+ ┃ ┃ ┗ 📜item.py
+ ┃ ┣ 📂services
+ ┃ ┃ ┣ 📜user_service.py
+ ┃ ┃ ┗ 📜item_service.py
+ ┃ ┣ 📂crud
+ ┃ ┃ ┣ 📜user_crud.py
+ ┃ ┃ ┗ 📜item_crud.py
+ ┃ ┣ 📂services
+ ┃ ┃ ┣ 📜s3_service.py
+ ┃ ┃ ┗ 📜stripe_service.py
+ ┃ ┗ 📜main.py
+ ┣ 📂tests
+ ┃ ┣ 📜test_user.py
+ ┃ ┗ 📜test_item.py
+ ┣ 📜.env
+ ┣ 📜.gitignore
+ ┣ 📜Dockerfile
+ ┣ 📜README.md
+ ┗ 📜requirements.txt
 ```
 
-Sau khi cài đặt FastAPI, bạn có thể bắt đầu viết chương trình đầu tiên của mình. Dưới đây là một ví dụ về chương trình đơn giản sử dụng FastAPI:
+Trong đó:
 
-```python
-from fastapi import FastAPI
+- `app`: Thư mục chính chứa mã nguồn của dự án.
+- `api`: Chứa các endpoints của API.
+- `core`: Chứa các cấu hình cốt lõi của dự án.
+- `crud`: Chứa các file nhằm thực thi các câu lệnh create read update delete đối với database thông qua orm.
+- `models`: Chứa các models của dự án.
+- `schemas`: Chứa các schemas, thường được sử dụng để tạo và kiểm tra dữ liệu đầu vào và đầu ra.
+- `services`: Chứa các dịch vụ, thường được sử dụng để xử lý logic nghiệp vụ.
+- `tests`: Chứa các test case của dự án.
+- `.env`: Chứa các biến môi trường.
+- `Dockerfile`: Dùng để tạo Docker image.
+- `requirements.txt`: Chứa các thư viện Python cần thiết cho dự án.
 
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-```
-
-Trong đoạn code trên, chúng tôi đã tạo một ứng dụng FastAPI và định nghĩa một route tại đường dẫn "/". Khi bạn truy cập vào đường dẫn này, nó sẽ trả về một đối tượng JSON với nội dung "Hello: World".
-
-FastAPI cung cấp nhiều tính năng mạnh mẽ khác như hỗ trợ cho việc xây dựng API RESTful, hỗ trợ cho việc xây dựng ứng dụng web với giao diện người dùng tương tác, và nhiều hơn nữa. Nếu bạn muốn tìm hiểu thêm về FastAPI, hãy xem video giới thiệu về FastAPI trên kênh Youtube của chúng tôi.
-
+Cấu trúc thư mục này không cố định và có thể thay đổi tùy theo yêu cầu và quy mô của dự án.
+[đây là bộ template của tôi đang xây dựng và hoàn thiện] (https://github.com/haiconmeo/fastapi-template-pydanticv2)
 Nguồn tham khảo:
-1. FastAPI Documentation: https://fastapi.tiangolo.com/
-2. Python Documentation: https://docs.python.org/3/
-3. Youtube Video: [Link to the video]
+1. [FastAPI Documentation](https://fastapi.tiangolo.com/)
+2. [FastAPI Project Generation with Docker, HTTPS, PostgreSQL, etc.](https://fastapi.tiangolo.com/project-generation/)
+3. [Python Project Layout Best Practices](https://realpython.com/tutorials/best-practices/)
