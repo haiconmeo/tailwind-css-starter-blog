@@ -3,7 +3,7 @@ const siteMetadata = {
   title: 'Haiconmeo Blog',
   author: 'Hoang Huu Manh',
   headerTitle: 'Haiconmeo',
-  description: "Hey, I'm a backend web developer",
+  description: "Lấy code chứng đạo, từ hư hóa thực, lập trình thành tôn 👨‍💻",
   language: 'vi',
   theme: 'system', // system, dark or light
   siteUrl: 'https://haiconmeo.info',
