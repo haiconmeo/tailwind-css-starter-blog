@@ -1,0 +1,71 @@
+---
+title: 'Các trường hợp sử dụng Apache Kafka: Khi nào sử dụng và không sử dụng'
+date: '2023-01-09'
+tags: ['kafka', 'backend']
+draft: false
+summary: Apache Kafka là một nền tảng xử lý luồng dữ liệu mã nguồn mở được phát triển ban đầu bởi LinkedIn. Sau khi mở rộng các khả năng của Kafka, LinkedIn đã quyên góp Kafka cho Apache để phát triển tiếp.
+---
+
+# Các trường hợp sử dụng Apache Kafka: Khi nào sử dụng và không sử dụng
+
+
+
+## Giới thiệu Apache Kafka
+
+Apache Kafka là một nền tảng xử lý luồng dữ liệu mã nguồn mở được phát triển ban đầu bởi LinkedIn. Sau khi mở rộng các khả năng của Kafka, LinkedIn đã quyên góp Kafka cho Apache để phát triển tiếp.
+
+Kafka hoạt động giống như một hàng đợi tin nhắn truyền thống (ví dụ RabbitMQ) để cho phép xuất bản và đăng ký các luồng tin nhắn. Tuy nhiên, Kafka khác với các hàng đợi thông điệp truyền thống ở 3 khía cạnh chính:
+
+- Kafka hoạt động như một hệ thống phân tán hiện đại có thể chạy như một cụm và có thể mở rộng để xử lý bất kỳ số lượng ứng dụng nào.
+- Kafka được thiết kế để phục vụ như một hệ thống lưu trữ và có thể lưu trữ dữ liệu bao lâu tùy thích; hầu hết các hàng đợi tin nhắn xóa tin nhắn ngay sau khi người tiêu dùng xác nhận nhận. 
+- Kafka xử lý luồng dữ liệu, tính toán các luồng và tập dữ liệu phái sinh động, thay vì chỉ chuyển các lô tin nhắn.
+
+## Kafka được sử dụng để làm gì?
+
+Kafka là hệ thống xử lý luồng được sử dụng cho tin nhắn, theo dõi hoạt động trang web, thu thập số liệu và giám sát, nhật ký, nguồn sự kiện, bản ghi nhật ký và phân tích thời gian thực.
+
+Nó phù hợp cho các ứng dụng xử lý tin nhắn quy mô lớn vì nó mạnh mẽ, đáng tin cậy và có khả năng chịu lỗi tốt hơn so với các hàng đợi thông điệp truyền thống.
+
+## Các khái niệm cốt lõi của Apache Kafka
+
+Nhìn chung, Kafka chấp nhận luồng các sự kiện do các nhà sản xuất dữ liệu viết. Kafka lưu trữ hồ sơ theo thời gian trong các phân vùng trên các máy chủ (broker); nhiều broker cấu thành một cụm. Mỗi bản ghi chứa thông tin về một sự kiện và bao gồm một cặp khóa-giá trị; dấu thời gian và tiêu đề là thông tin bổ sung tùy chọn. Kafka nhóm các bản ghi thành chủ đề; người tiêu dùng dữ liệu nhận dữ liệu của họ bằng cách đăng ký các chủ đề mà họ muốn.
+
+Hãy xem xét kỹ hơn mỗi khái niệm cốt lõi này.
+
+## Các trường hợp sử dụng tốt nhất của Apache Kafka
+
+Dưới đây là các trường hợp sử dụng phổ biến nhất của Apache Kafka.
+
+### Theo dõi hoạt động 
+
+Đây là trường hợp sử dụng ban đầu cho Kafka. LinkedIn cần xây dựng lại pipeline theo dõi hoạt động của người dùng dưới dạng một tập hợp các luồng cấp tin theo thời gian thực. 
+
+Các sự kiện như nhấp chuột, đăng ký, thích, thời gian dành trên một số trang web nhất định, đặt hàng, ... có thể được xuất bản (tạo ra) vào các chủ đề Kafka chuyên dụng. Mỗi luồng dữ liệu có sẵn để (được tiêu thụ bởi) bất kỳ số lượng trường hợp sử dụng nào, chẳng hạn như tải vào hồ dữ liệu hoặc kho dữ liệu để xử lý và báo cáo ngoại tuyến.
+
+### Xử lý dữ liệu thời gian thực
+
+Nhiều hệ thống yêu cầu dữ liệu được xử lý ngay khi nó có sẵn. Kafka truyền dữ liệu từ nhà sản xuất đến người tiêu dùng với độ trễ rất thấp (5 milli giây, ví dụ). 
+
+### Nhắn tin
+
+Kafka hoạt động tốt như một thay thế cho các message broker truyền thống; Kafka có throughput tốt hơn, phân vùng tích hợp, sao chép và khả năng chịu lỗi, cũng như các thuộc tính mở rộng tốt hơn.
+
+### Các chỉ số hoạt động/KPI
+
+Kafka thường được sử dụng cho dữ liệu giám sát hoạt động. Điều này liên quan đến việc tổng hợp thống kê từ các ứng dụng phân tán để tạo ra các luồng dữ liệu hoạt động được tập trung hóa.
+
+### Tổng hợp nhật ký 
+
+Nhiều tổ chức sử dụng Kafka để tổng hợp các bản ghi nhật ký. 
+
+## Khi nào không nên sử dụng Kafka
+
+Vì phạm vi và quy mô của Kafka nên rất dễ hiểu tại sao bạn có thể coi nó như là một loại dao phục vụ đa năng cho các ứng dụng dữ liệu lớn. Nhưng nó bị giới hạn bởi một số hạn chế nhất định, bao gồm tính phức tạp tổng thể của nó, và có những kịch bản mà Kafka không phù hợp.
+
+"Dữ liệu nhỏ"
+
+Vì Kafka được thiết kế để xử lý khối lượng dữ liệu lớn, nên nó không cần thiết nếu bạn chỉ cần xử lý một lượng nhỏ tin nhắn mỗi ngày. Sử dụng các hàng đợi thông điệp truyền thống như RabbitMQ cho các tập dữ liệu tương đối nhỏ.
+
+## Tóm tắt 
+
+Sức mạnh và tính linh hoạt của Kafka là những động lực chính cho sự phổ biến của nó. Kafka đặc biệt có giá trị trong các kịch bản yêu cầu xử lý dữ liệu thời gian thực và theo dõi hoạt động ứng dụng, cũng như cho các mục đích giám sát.
