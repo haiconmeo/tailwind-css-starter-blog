@@ -1,0 +1,184 @@
+---
+title: 'Sematic search là gì?. triển khai sematic search trên mongodb'
+date: '2023-01-09'
+tags: ['fastapi', 'python', 'mongodb','nlp','sematic search']
+draft: false
+summary: FastAPI là một framework hiện đại, nhanh chóng và dễ sử dụng, dựa trên tiêu chuẩn Python 3.6 trở lên. Nó được thiết kế để dễ dàng xây dựng API với hiệu suất cao, và nó cung cấp một giao diện người dùng tương tác tốt..
+---
+
+Đây là một bài viết giới thiệu khái quát về semantic search - tìm kiếm ngữ nghĩa:
+
+# Semantic Search - Tìm kiếm ngữ nghĩa
+
+## Định nghĩa
+
+Semantic search hay còn gọi là tìm kiếm ngữ nghĩa, là kỹ thuật tìm kiếm hiểu được ý nghĩa của các từ khóa và trả về kết quả phù hợp với ngữ cảnh. 
+
+Khác với tìm kiếm thông thường chỉ dựa trên từ khóa, semantic search có khả năng hiểu được ý nghĩa đằng sau các từ khóa và ngữ cảnh của chúng để cung cấp kết quả chính xác hơn.
+
+## Lợi ích 
+
+Một số lợi ích chính của semantic search:
+
+- Cho kết quả chính xác và phù hợp hơn với nhu cầu tìm kiếm của người dùng
+- Hiểu được ngữ cảnh và mối quan hệ giữa các khái niệm 
+- Có khả năng trả lời các câu hỏi phức tạp
+- Hỗ trợ tìm kiếm bằng ngôn ngữ tự nhiên
+
+## Công nghệ 
+
+Một số công nghệ cho phép xây dựng semantic search:
+
+- Xử lý ngôn ngữ tự nhiên (NLP): phân tích và xử lý ngôn ngữ để hiểu nghĩa 
+- Học máy: sử dụng các mô hình AI/ML để hiểu nghĩa khái niệm
+- Knowledge graph: lưu trữ kiến thức và mối liên hệ giữa các khái niệm 
+- Ontology: định nghĩa các thực thể và mối quan hệ trong một lĩnh vực cụ thể
+
+## Ứng dụng
+
+Semantic search ứng dụng rất rộng rãi trong nhiều lĩnh vực khác nhau:
+
+- Tìm kiếm web (Google, Bing,...)
+- Trợ lý ảo (Alexa, Siri,...)
+- Recommender system 
+- Chăm sóc khách hàng
+- Tìm kiếm nội dung doanh nghiệp
+- Hệ thống câu hỏi trả lời,...
+
+# Xây dựng hệ thống sematic search trên mongodb
+
+## Thiết lập một cụm MongoDB Atlas
+Bây giờ, chúng ta sẽ bắt đầu thiết lập một cụm MongoDB Atlas, mà chúng ta sẽ sử dụng để lưu trữ nhúng của chúng ta.
+**Bước 1**: Tạo một tài khoản
+Để tạo một cụm MongoDB Atlas, trước hết, bạn cần tạo một tài khoản MongoDB Atlas nếu bạn chưa có một. Truy cập trang web của MongoDB Atlas và nhấp vào "Đăng ký".
+
+**Bước 2**: Xây dựng một cụm mới
+Sau khi tạo một tài khoản, bạn sẽ được chuyển đến bảng điều khiển MongoDB Atlas. Bạn có thể tạo một cụm trong bảng điều khiển hoặc sử dụng API công khai của chúng tôi, CLI, hoặc nhà cung cấp Terraform. Để làm điều này trong bảng điều khiển, nhấp vào "Tạo Cụm," và sau đó chọn tùy chọn cụm chia sẻ. Chúng tôi đề xuất tạo một cụm cấp độ M0.
+Nếu bạn cần sự hỗ trợ, hãy xem hướng dẫn của chúng tôi về triển khai Atlas bằng các chiến lược khác nhau.
+
+**Bước 3**: Tạo các bộ sưu tập của bạn
+Bây giờ, chúng ta sẽ tạo các bộ sưu tập của bạn trong cụm để chúng ta có thể chèn dữ liệu của mình. Chúng cần được tạo ngay bây giờ để bạn có thể tạo một kích hoạt Atlas mà sẽ nhắm mục tiêu chúng.
+Đối với bài hướng dẫn này, bạn có thể tạo bộ sưu tập của mình nếu bạn có dữ liệu để sử dụng. Nếu bạn muốn sử dụng dữ liệu mẫu của chúng tôi, bạn cần trước tiên tạo một bộ sưu tập trống trong cụm để chúng ta có thể thiết lập kích hoạt để nhúng chúng khi chúng được chèn. Hãy tạo một cơ sở dữ liệu "sample_mflix" và bộ sưu tập "movies" ngay bây giờ bằng giao diện người dùng, nếu bạn muốn sử dụng dữ liệu mẫu của chúng tôi.
+
+## Cấu hình chỉ mục
+Bây giờ, hãy chuyển đến Atlas Search và tạo một chỉ mục. Sử dụng định nghĩa chỉ mục JSON và chèn thông tin sau, thay thế tên trường nhúng bằng trường mà bạn chọn. Nếu bạn đang sử dụng cơ sở dữ liệu sample_mflix, đó nên là "plot_embedding", và đặt tên cho nó. Tôi đã sử dụng "moviesPlotIndex" cho cấu hình của mình với dữ liệu mẫu.
+Trước tiên, nhấp vào tab "search" trên cụm của bạn."
+
+``` json
+{
+  "fields": [
+    {
+      "numDimensions": 768,
+      "path": "vector",
+      "similarity": "dotProduct",
+      "type": "vector"
+    },
+    {
+      "path": "per_search_1",
+      "type": "filter"
+    },
+    {
+      "path": "per_search_2",
+      "type": "filter"
+    }
+  ]
+}
+```
+
+## Xây dự hệ thống tìm kiếm sản phẩm bằng vector seach 
+
+- bước 1: vector từ nội dung cần tìm kiếm
+- bước 2: tìm kiếm các vector có khoảng cách gần với vector cần tìm kiếm nhất (KNN)
+- bước 3: trả về data tương ứng với các vector tìm được
+
+**Chọn model embedding phù hợp**
+
+Hiện nay có rất nhiều model embedding hoạt động hiệu quả như các model của openAI, SGPT, BERT,... Tùy vào số lượng data và chi phí dự án mà sẽ chọn model nào. Đối với openai, việc triển khai đơn giản chỉ là việc call api, chi phí sẽ được tính trên số lượng token truyền lên. Còn các model khác thì phải dự deploy lên self host nên chỉ tốn chi phí server, phương án này đảm bảo được tính bảo mật dữ liệu vì không đưa cho bên thứ 3
+
+Đây là function để lấy vector trên openAI
+
+``` python
+import openai
+
+
+openai.api_key = GPT_KEY
+
+def get_embedding_gpt(text, model='text-embedding-ada-002'):
+    try:
+        text = text.replace("\n", " ")
+        return openai.Embedding.create(input=[text], model=model)["data"][0]["embedding"]
+    except Exception as e:
+        return None
+```
+
+Tiếp theo là bước insert dữ liệu vào mongodb
+
+``` python
+
+import pymongo
+
+MONGODB_URL = ''
+
+client = pymongo.MongoClient(MONGODB_URL)
+db = client[settings.MONGODB_DATABASE]
+
+document ={
+    "name":"product A",
+    "description": "description product A",
+    "price":123123,
+    "vector": get_embedding_gpt(......) #ở đây bạn đưa vào string muốn embedding
+}
+db['embedding'].insert_one(document)
+
+```
+
+với schema như trên thì phần config json ở mongo bạn sửa lại như sau
+
+``` json 
+{
+  "fields": [
+    {
+      "numDimensions": 1536, // tương ứng với độ dài vector openai model
+      "path": "vector",
+      "similarity": "dotProduct",
+      "type": "vector"
+    },
+    {
+      "path": "name",
+      "type": "filter"
+    },
+    {
+      "path": "price",
+      "type": "filter"
+    }
+  ]
+}
+
+```
+
+### Tiếp theo là phần tìm kiếm
+
+``` python
+
+query = get_embedding_gpt(q) # là nội dung cần tìm kiếm
+results = db['embedding'].aggregate([
+    {"$vectorSearch": {
+        "queryVector": query,
+        "path": "vector", # tên column vector 
+        "numCandidates": 100,
+        "limit": k,
+        "index": 'vector',
+        "filter":{"$and": [{ "price": { "$eq": int(input['price']) } }]} # per filter
+        }
+    },
+    {
+        "$project": { # các field cần lấy
+        "name":1,
+        "description":1,
+        "price": 1,
+        "score": { "$meta": "vectorSearchScore" }}
+    }
+        
+])
+```
+
