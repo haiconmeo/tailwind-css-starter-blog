@@ -1,0 +1,70 @@
+---
+title: 'Giảm kích thước Docker image với builder pattern'
+date: '2023-01-15'
+tags: ['Docker']
+draft: false
+summary: Docker image ngày càng trở nên phổ biến để triển khai ứng dụng. Tuy nhiên, kích thước image có thể dễ dàng phình to nếu bạn không cẩn thận trong quá trình xây dựng. Điều này làm chậm quá trình triển khai và tăng chi phí lưu trữ. May mắn thay, có một kỹ thuật đơn giản được gọi là "builder pattern" giúp giảm kích thước image Docker. 
+---
+
+
+# Giảm kích thước Docker image với builder pattern
+
+Docker image ngày càng trở nên phổ biến để triển khai ứng dụng. Tuy nhiên, kích thước image có thể dễ dàng phình to nếu bạn không cẩn thận trong quá trình xây dựng. Điều này làm chậm quá trình triển khai và tăng chi phí lưu trữ. May mắn thay, có một kỹ thuật đơn giản được gọi là "builder pattern" giúp giảm kích thước image Docker. 
+
+## Builder pattern là gì?
+
+Builder pattern chia quá trình xây dựng image Docker thành 2 stage riêng biệt:
+
+1. Stage build
+2. Stage runtime
+
+Trong stage build, tất cả các dependencies và tool cần thiết để build ứng dụng sẽ được cài đặt. Sau đó app sẽ được biên dịch và đóng gói vào một file nhị phân duy nhất.
+
+Trong stage runtime, copy file nhị phân đã đóng gói ở stage 1 và chỉ cài đặt những gì cần thiết để chạy ứng dụng. Nhờ đó, tất cả mọi thứ không cần thiết sẽ không có mặt trong image cuối cùng.
+
+## Lợi ích của builder pattern
+
+- Giảm kích thước image cuối cùng do loại bỏ tất cả các dependencies và tool dùng để build không cần thiết trong runtime.
+
+- Tăng tốc độ build image khi không cần phải cài đặt lại các dependencies cho mỗi lần thay đổi code. Chỉ cần build lại binary trong stage 1. 
+
+- Cung cấp cách tiếp cận dựa trên layered, giúp cache và reuse các layer tốt hơn.
+
+ Đây là ví dụ sử dụng kỹ thuật builder pattern trong Docker với Golang:
+
+```dockerfile
+# Stage 1: build stage
+FROM golang:1.17-alpine AS build
+WORKDIR /app
+COPY . .
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -o /go/bin/app
+
+# Stage 2: smaller runtime container 
+FROM alpine:latest  
+RUN apk add --no-cache ca-certificates
+WORKDIR /root/
+COPY --from=build /go/bin/app /app/
+CMD ["/app"]  
+```
+
+Giải thích:
+
+- Stage 1: 
+    - Sử dụng golang image để build app Go
+    - Copy toàn bộ code vào image
+    - Cài đặt dependencies với `go mod download` 
+    - Build app thành binary `app` không có debug symbol
+
+- Stage 2:
+    - Dùng một alpine image nhỏ hơn 
+    - COPY file binary đã build ở stage 1 vào image
+    - Chỉ cài đặt ca-certificates để chạy được file binary
+    - Set CMD để chạy app 
+
+Ưu điểm:
+
+- Image runtime cuối cùng rất nhỏ chỉ có file binary và certs cần thiết
+- Không cần re-build lại các dependencies nên image có thể tận dụng cache tốt hơn, tăng tốc build
+
+Bằng cách này bạn có thể giảm kích thước image Docker Golang đáng kể. Hãy thử ngay nhé!
