@@ -1,0 +1,120 @@
+---
+title: 'superset cơ bản'
+date: '2023-01-1b'
+tags: ['superset']
+draft: false
+summary: Apache Superset là một ứng dụng phân tích, trực quan hóa và khám phá dữ liệu mã nguồn mở. Nó cung cấp giao diện đồ họa trực quan, cho phép người dùng khám phá và phân tích dữ liệu mà không cần code.. 
+---
+
+
+# **Apache Superset**
+
+Apache Superset là một ứng dụng phân tích, trực quan hóa và khám phá dữ liệu mã nguồn mở. Nó cung cấp giao diện đồ họa trực quan, cho phép người dùng khám phá và phân tích dữ liệu mà không cần code.
+
+## **Tổng quan**
+
+Superset được xây dựng dựa trên Python, hỗ trợ khả năng mở rộng cao và tích hợp một loạt thư viện phân tích và trực quan hóa dữ liệu phổ biến. 
+
+Nó có thể kết nối với nhiều nguồn dữ liệu SQL và NoSQL như:
+
+- Postgres
+- MySQL 
+- MongoDB
+- Cassandra
+- Druid
+- Hive
+- Presto
+
+Ngoài ra Superset còn hỗ trợ kết nối với các nguồn dữ liệu đại lượng (Big Data) phổ biến:
+
+- Google BigQuery
+- Snowflake  
+- Amazon Redshift
+
+## **Ưu điểm**
+
+- Giao diện đồ họa thân thiện, dễ sử dụng
+- Hỗ trợ nhiều loại biểu đồ, báo cáo đẹp mắt
+- Khả năng mở rộng và tùy biến cao nhờ sử dụng Python
+- Tích hợp nhiều nguồn dữ liệu
+- Cho phép chia sẻ Dashboard và dữ liệu
+
+## **So sánh với các công cụ tương tự**
+
+### **Tableau**
+
+- Tableau mạnh hơn về khả năng trực quan hóa dữ liệu với nhiều loại biểu đồ đẹp, công cụ kéo thả.
+- Superset có khả năng code và tùy biến cao hơn.
+- Tableau có giá thành cao hơn vì là giải pháp thương mại. Superset là mã nguồn mở miễn phí.
+
+### **Grafana**
+
+- Grafana chuyên sâu về giám sát và cảnh báo hệ thống.
+- Superset có phạm vi ứng dụng rộng hơn, bao gồm phân tích, trực quan hóa dữ liệu chung. 
+- Grafana được tối ưu hơn cho việc vẽ đồ thị time series.
+
+## **Hướng dẫn sử dụng**
+
+
+### **Cài đặt Apache Superset**
+
+Có 3 cách chính để cài đặt Apache Superset:
+
+#### **1. Sử dụng Docker**
+
+- Cách nhanh nhất để chạy Superset là sử dụng docker image sẵn có
+- Chỉ cần chạy lệnh sau để khởi tạo một container chạy Superset:
+
+```
+docker run -d --name superset -p 8088:8088 apache/superset
+```
+
+- Truy cập vào địa chỉ `http://localhost:8088` để sử dụng Superset
+
+#### **2. Sử dụng Ansible**
+
+- Dùng Ansible role để cài đặt và cấu hình Superset trên nhiều máy chủ
+- Role có sẵn tại: https://github.com/apache/superset/tree/master/contrib/ansible
+- Chỉ cần chạy Ansible playbook là có thể cài đặt và cấu hình Superset tự động
+
+#### **3. Cài đặt từ source**
+
+- Tải source code Superset về máy 
+- Tạo môi trường ảo Python
+- Chạy cài đặt các package phụ thuộc
+- Khởi động server để sử dụng Superset
+
+### **Cấu hình**
+
+Sau khi cài đặt xong, cần kết nối tới cơ sở dữ liệu và tạo tài khoản admin để có thể đăng nhập và sử dụng.
+
+Như vậy là đã sẵn sàng để bắt đầu trực quan hóa và khám phá dữ liệu với Superset.
+
+### **Các bước sử dụng cơ bản**
+
+1. Thêm connect tới cơ sở dữ liệu
+2. Tạo datasource 
+3. Khám phá và phân tích dữ liệu
+4. Xây dựng Dashboard với các loại biểu đồ
+5. Chia sẻ Insight 
+
+### **Mở rộng tính năng**
+
+Superset cho phép tùy biến cao thông qua viết thêm:
+
+- Custom data source 
+- Custom visualization plugins
+
+Như vậy có thể dễ dàng mở rộng các tính năng của ứng dụng.
+
+## **Ứng dụng demo với Movielens**
+
+Với dataset Movielens chứa rating của người dùng đối với các bộ phim, ta có thể:
+
+- Xây dựng dashboard thống kê top phim được đánh giá cao
+- Phân tích xu hướng rating theo thời gian, thể loại 
+- Xây dựng recommendation system để đề xuất phim
+
+## **Kết luận**
+
+Apache Superset là một công cụ mạnh mẽ để phân tích, trực quan hóa dữ liệu. Khả năng tùy biến cao thông qua viết code mở rộng là một lợi thế lớn của Superset.
