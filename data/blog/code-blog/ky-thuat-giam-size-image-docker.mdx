@@ -1,5 +1,5 @@
 ---
-title: 'Giảm kích thước Docker image với builder pattern'
+title: 'Giảm kích thước Docker image với mutli stage'
 date: '2023-01-15'
 tags: ['Docker']
 draft: false
@@ -7,13 +7,13 @@ summary: Docker image ngày càng trở nên phổ biến để triển khai ứ
 ---
 
 
-# Giảm kích thước Docker image với builder pattern
+# Giảm kích thước Docker image với mutli-stage
 
 Docker image ngày càng trở nên phổ biến để triển khai ứng dụng. Tuy nhiên, kích thước image có thể dễ dàng phình to nếu bạn không cẩn thận trong quá trình xây dựng. Điều này làm chậm quá trình triển khai và tăng chi phí lưu trữ. May mắn thay, có một kỹ thuật đơn giản được gọi là "builder pattern" giúp giảm kích thước image Docker. 
 
-## Builder pattern là gì?
+## Mutli stage là gì?
 
-Builder pattern chia quá trình xây dựng image Docker thành 2 stage riêng biệt:
+Mutli stage chia quá trình xây dựng image Docker thành 2 stage riêng biệt:
 
 1. Stage build
 2. Stage runtime
