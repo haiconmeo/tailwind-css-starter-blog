@@ -9,7 +9,7 @@ const siteMetadata = {
   siteUrl: 'https://haiconmeo.info',
   siteRepo: 'https://github.com/haiconmeo',
   siteLogo: '/static/images/logo.png',
-  socialBanner: '/static/images/twitter-card.png',
+  socialBanner: 'https://res.cloudinary.com/dsthxgzde/image/upload/v1671796352/film%20photo/000017_x4h3kc.jpg',
   mastodon: 'https://mastodon.social/@mastodonuser',
   email: 'hoanghuumanh54@gmail.com',
   github: 'https://github.com/haiconmeo',
