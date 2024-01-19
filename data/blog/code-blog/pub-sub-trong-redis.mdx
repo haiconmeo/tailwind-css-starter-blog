@@ -58,4 +58,66 @@ Nhược điểm:
 
 Như vậy, asyncio giúp lập trình viên Python viết được các ứng dụng bất đồng bộ một cách hiệu quả, tiết kiệm tài nguyên. Nó rất phù hợp với các tasks I/O bound như networking, web services, databases...
 
+## Ví dụ 
+
+Để gửi nhiều yêu cầu HTTP đồng thời sử dụng `asyncio` trong Python, bạn có thể sử dụng thư viện `httpx`, một thư viện HTTP client hỗ trợ asyncio và rất tương đồng với `requests`. Dưới đây là một ví dụ đơn về cách sử dụng `asyncio` và `httpx` để gửi nhiều yêu cầu HTTP:
+
+```python
+import asyncio
+import httpx
+
+async def fetch_data(url):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        return {"url": url, "status_code": response.status_code, "content": response.text}
+
+async def main():
+    urls = ["https://example.com", "https://example.org", "https://example.net"]
+
+    tasks = [fetch_data(url) for url in urls]
+    results = await asyncio.gather(*tasks)
+
+    for result in results:
+        print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Trong đoạn mã này, hàm `fetch_data` được định nghĩa để gửi yêu cầu GET đồng thời sử dụng `httpx.AsyncClient()`. Trong hàm `main`, một danh sách các URL cần gửi yêu cầu được tạo ra, sau đó một danh sách các `fetch_data` task được tạo từ danh sách URL này. Cuối cùng, `asyncio.gather` được sử dụng để chờ đợi tất cả các task hoàn thành.
+
+
+`asyncio.Semaphore` để giới hạn số lượng yêu cầu HTTP đồng thời:
+
+```python
+import asyncio
+import httpx
+
+async def fetch_data(url, semaphore):
+    async with semaphore:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            return {"url": url, "status_code": response.status_code, "content": response.text}
+
+async def main():
+    urls = ["https://example.com", "https://example.org", "https://example.net"]
+
+    # Đặt giới hạn là 2 yêu cầu đồng thời
+    semaphore = asyncio.Semaphore(2)
+
+    tasks = [fetch_data(url, semaphore) for url in urls]
+    results = await asyncio.gather(*tasks)
+
+    for result in results:
+        print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Trong đoạn mã này, `asyncio.Semaphore(2)` được sử dụng để giới hạn số lượng yêu cầu HTTP đồng thời là 2. Hàm `fetch_data` được bao bọc bởi `async with semaphore:` để đảm bảo rằng không quá 2 yêu cầu được thực hiện cùng một lúc.
+
+Điều này có thể hữu ích khi bạn muốn kiểm soát đồng thời số lượng yêu cầu để tránh tình trạng quá tải server hoặc để duy trì hiệu suất ổn định trong các tình huống yêu cầu nhiều tài nguyên.
+
+Lưu ý rằng bạn cũng có thể điều chỉnh số lượng yêu cầu đồng thời bằng cách sử dụng `asyncio.Semaphore` để giới hạn đồng thời số lượng task đang chạy. Điều này có thể hữu ích khi bạn muốn kiểm soát đồng thời tác vụ HTTP để tránh quá tải server hoặc giữ cho các nguồn tài nguyên được quản lý hiệu quả.
 Trong FastAPI, thường thì bạn không cần tạo event loop bằng cách sử dụng asyncio.get_event_loop() vì FastAPI tự động quản lý event loop. FastAPI sử dụng Starlette làm backend và Starlette sử dụng asyncio để quản lý các hàm bất đồng bộ.
