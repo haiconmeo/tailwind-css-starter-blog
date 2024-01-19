@@ -1,0 +1,62 @@
+---
+title: 'asyncio trong Python:'
+date: '2023-01-19'
+tags: ['async','python']
+draft: false
+summary: Asyncio là một thư viện để lập trình bất đồng bộ (asynchronous programming) trong Python. Nó cung cấp các cơ chế để viết code bất đồng bộ một cách đơn giản và trực quan.
+---
+
+ Đây là một bài viết chi tiết về asyncio trong Python:
+
+Asyncio là một thư viện để lập trình bất đồng bộ (asynchronous programming) trong Python. Nó cung cấp các cơ chế để viết code bất đồng bộ một cách đơn giản và trực quan.
+
+Các khái niệm chính trong Asyncio:
+
+- Coroutines: Các hàm bất đồng bộ. Chúng có thể tạm dừng và nhường quyền điều khiển cho hàm khác mà không bị block thread chính.
+
+- Event loops: Vòng lặp xử lý các coroutines và callbacks. Nó quản lý và điều phối các tác vụ bất đồng bộ. 
+
+- Futures & Tasks: Đại diện cho kết quả trong tương lai của một coroutine. Task bao bọc coroutine và trả về Future.
+
+Cách sử dụng Asyncio:
+
+1. Định nghĩa các coroutines với từ khóa async def
+
+2. Tạo ra một event loop:
+
+```
+import asyncio
+loop = asyncio.get_event_loop()
+```
+
+3. Chạy các coroutines trong event loop bằng asyncio.run() hoặc loop.run_until_complete():
+
+```
+async def main():
+   print('hello')
+   await some_coroutine()
+
+asyncio.run(main())
+```
+
+4. Sử dụng await để chờ đợi kết quả từ các hàm bất đồng bộ khác
+
+Ưu điểm của Asyncio:
+
+- Code đơn giản, dễ đọc hiểu 
+
+- Hiệu năng cao với I/O bound tasks
+
+- Tiết kiệm tài nguyên so với multi-threading
+
+Nhược điểm:
+
+- Khó debug và xử lý lỗi
+
+- Không phù hợp cho CPU-bound tasks
+
+- Yêu cầu framework/libraries hỗ trợ asyncio
+
+Như vậy, asyncio giúp lập trình viên Python viết được các ứng dụng bất đồng bộ một cách hiệu quả, tiết kiệm tài nguyên. Nó rất phù hợp với các tasks I/O bound như networking, web services, databases...
+
+Trong FastAPI, thường thì bạn không cần tạo event loop bằng cách sử dụng asyncio.get_event_loop() vì FastAPI tự động quản lý event loop. FastAPI sử dụng Starlette làm backend và Starlette sử dụng asyncio để quản lý các hàm bất đồng bộ.
