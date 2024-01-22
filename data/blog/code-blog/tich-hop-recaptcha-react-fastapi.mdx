@@ -1,0 +1,87 @@
+---
+title: 'Tích Hợp Captcha react fastapi'
+date: '2023-01-22'
+tags: ['fastapi', 'backend']
+draft: false
+summary: Captcha là viết tắt của "Completely Automated Public Turing test to tell Computers and Humans Apart", có nghĩa là một bài kiểm tra Turing tự động hoàn toàn để phân biệt máy tính và con người.
+---
+
+# Captcha là gì
+
+Captcha là viết tắt của "Completely Automated Public Turing test to tell Computers and Humans Apart", có nghĩa là một bài kiểm tra Turing tự động hoàn toàn để phân biệt máy tính và con người.
+
+Captcha là một công nghệ được sử dụng rộng rãi để bảo vệ website và dịch vụ trực tuyến khỏi các cuộc tấn công tự động bởi bot. Nó hoạt động bằng cách yêu cầu người dùng nhập đúng một chuỗi ký tự hoặc giải một bài toán đơn giản để chứng minh rằng họ là con người.  
+
+## Các loại captcha phổ biến:
+
+- Captcha hình ảnh: yêu cầu người dùng nhập các ký tự trong hình ảnh biến dạng.
+
+- Captcha âm thanh: yêu cầu người dùng gõ các ký tự mà họ nghe thấy.  
+
+- Captcha câu hỏi: yêu cầu trả lời một câu hỏi đơn giản.
+
+- ReCAPTCHA: sử dụng phân tích hành vi của người dùng thay vì yêu cầu nhập các ký tự.
+
+## Hướng dẫn tích hợp Captcha
+
+### Để tích hợp Captcha vào website, bạn cần thực hiện các bước sau:
+
+1. Đăng ký tài khoản với nhà cung cấp Captcha như Google reCAPTCHA để lấy Site key và Secret key.
+
+2. Thêm mã Javascript cung cấp bởi nhà cung cấp vào website. Với reCAPTCHA sẽ là một đoạn mã nhúng vào HTML.  
+
+3. Hiển thị Captcha trên các form cần bảo vệ như đăng ký, đăng nhập, thanh toán... Bằng cách sử dụng các component tương ứng của từng nhà cung cấp.
+
+4. Xác thực Captcha response ở phía backend bằng cách gọi API xác thực của nhà cung cấp, truyền vào token và secret key.
+
+5. Báo lỗi nếu Captcha response không hợp lệ, yêu cầu người dùng làm lại.
+
+
+### Các bước thực hiện:
+
+1. Đăng ký một site key và secret key từ Google reCAPTCHA.
+
+2. Trên frontend React:
+
+- Cài đặt thư viện react-google-recaptcha:
+
+```
+npm install react-google-recaptcha
+```
+
+- Sử dụng Recaptcha component trong form cần xác thực:
+
+```jsx
+import ReCAPTCHA from "react-google-recaptcha";
+
+<ReCAPTCHA
+  sitekey="{SITE_KEY}"
+  onChange={onCaptchaChange}
+/>
+```
+
+3. Trên backend FastAPI:
+
+- Cài đặt thư viện python-dotenv để lưu keys
+- Validate token captcha gửi lên từ client bằng việc gọi API verify của Google
+
+```python
+import os
+import requests
+
+@app.post("/register")
+def register(token: str):
+    data = {"secret": os.getenv("SECRET_KEY"), "response": token}
+
+    r = requests.post(
+        "https://www.google.com/recaptcha/api/siteverify", data=data
+    )
+
+    if r.json()["success"]:
+        # xác thực thành công
+        # tạo tài khảon mới
+    else:
+        # xác thực thất bại  
+
+```
+
