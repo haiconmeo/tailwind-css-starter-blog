@@ -1,0 +1,125 @@
+---
+title: 'Wrapper trong Python - Tìm hiểu về cách wrap một hàm hay lớp để mở rộng tính năng'
+date: '2023-01-22'
+tags: ['Wrapper','python']
+draft: false
+summary: Wrapper là một kỹ thuật rất hữu ích và mạnh mẽ trong Python để bọc (wrap) một hàm, lớp hoặc module có sẵn để thêm các tính năng mới mà không làm thay đổi code gốc. Bài viết này sẽ cung cấp cho bạn cái nhìn tổng quan đầy đủ về wrapper trong Python cũng như cách áp dụng chúng trong thực tế.
+---
+
+Wrapper trong Python - Tìm hiểu về cách wrap một hàm hay lớp để mở rộng tính năng
+
+Wrapper là một kỹ thuật rất hữu ích và mạnh mẽ trong Python để bọc (wrap) một hàm, lớp hoặc module có sẵn để thêm các tính năng mới mà không làm thay đổi code gốc. Bài viết này sẽ cung cấp cho bạn cái nhìn tổng quan đầy đủ về wrapper trong Python cũng như cách áp dụng chúng trong thực tế.
+
+### Wrapper là gì?
+Wrapper trong Python là một lớp hoặc hàm bọc bên ngoài lớp hay hàm gốc, cho phép bạn mở rộng hoặc sửa đổi hành vi mặc định của chúng mà không cần chỉnh sửa trực tiếp vào code gốc.
+
+Cụ thể, wrapper sẽ định nghĩa các hàm hoặc lớp mới, trong đó gọi đến hàm hay lớp gốc, và thực hiện thêm một số logic xử lý trước hoặc sau lời gọi hàm gốc.
+
+### Tại sao nên dùng Wrapper trong Python?
+
+Wrapper mang lại nhiều lợi ích như:
+
+- Tái sử dụng code hiệu quả hơn
+- Dễ dàng mở rộng tính năng cho các hàm, lớp có sẵn mà không làm thay đổi code gốc
+- Tách biệt rõ ràng phần code chức năng và code mở rộng
+- Bảo trì code dễ dàng hơn
+
+### Các ứng dụng của Wrapper trong Python
+
+Dưới đây là một số ứng dụng hay của wrapper:
+
+- Logging và debugging
+- Security (kiểm tra quyền truy cập)  
+- Caching (lưu kết quả để trả về ngay lập tức)
+- Validation (kiểm tra đầu vào)
+- Retry (tự động retry khi có exception)
+- Compatibility (đóng gói các phiên bản cũ)
+
+### Cách thực hiện Wrapper trong Python
+
+Có 2 cách chính để tạo wrapper trong Python như sau:
+
+#### 1. Sử dụng hàm decorator
+Decorator là một trong những tính năng mạnh mẽ nhất của Python, cho phép chúng ta định nghĩa wrapper ngay trước khai báo hàm.
+
+Ví dụ minh họa:
+
+```python
+from functools import wraps
+
+def decorator(func):
+    @wraps(func) 
+    def wrapper(*args, **kwargs):
+        # Codes here
+        result = func(*args, **kwargs)
+        # Codes here
+        return result
+    return wrapper
+
+@decorator
+def print_text():
+   print("Hello")
+   
+print_text()
+```
+
+#### 2. Định nghĩa wrapper function/class bình thường
+
+Ngoài decorator, bạn cũng có thể định nghĩa một wrapper function hay class bình thường, sau đó truyền vào hàm/lớp gốc dưới dạng tham số. 
+
+```python
+def wrapper(func):
+    def inner(*args, **kwargs):
+        # Codes here
+         
+        return func(*args, **kwargs)
+     
+    return inner
+ 
+def print_text():
+    print("Hello")
+ 
+print_text = wrapper(print_text)
+ 
+print_text()
+```
+
+### Ví dụ về việc sử dụng wrapper để retry một hàm khi có exception trong Python
+
+```python
+from random import randrange
+from time import sleep
+
+MAX_RETRIES = 3
+
+def retry(func):
+    def wrapper(*args, **kwargs):
+        retries = 0
+        while retries < MAX_RETRIES:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                print(f"Got exception: {e}, retrying...")
+                retries += 1
+                sleep(0.5)
+        return func(*args, **kwargs)
+    return wrapper
+
+@retry
+def unreliable_function():
+    chance = randrange(10)
+    if chance < 3:
+        raise Exception("Something went wrong!")
+    else:
+        print("Function executed successfully!")
+
+unreliable_function() 
+```
+
+Ở đây chúng ta định nghĩa một decorator `@retry` để wrap lại hàm `unreliable_function`. 
+
+Hàm unreliable_function() có xác suất 30% sẽ throw exception. Wrapper sẽ bắt exception và retry lại hàm tối đa 3 lần trước khi thực sự fail.
+
+Việc retry sẽ giúp tăng tính ổn định và giảm khả năng lỗi cho các hàm không đáng tin cậy.
+
+Như vậy với ví dụ trên bạn đã thấy được cách áp dụng wrapper để retry khi có exception, một trong những ứng dụng hay của wrapper.
