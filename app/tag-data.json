@@ -1,1 +1,1 @@
-{"docker":1,"python":6,"async":1,"backend":6,"fastapi":5,"pubsub":1,"kafka":2,"mongodb":1,"nlp":1,"sematic-search":1,"golang":1,"node":1}
+{"superset":1,"fastapi":7,"pubsub":1,"python":9,"backend":7,"kafka":2,"async":2,"gil":1,"docker":1,"slack":1,"postgres":1,"lock":1,"mongodb":1,"nlp":1,"sematic-search":1,"golang":1,"node":1,"wrapper":1}

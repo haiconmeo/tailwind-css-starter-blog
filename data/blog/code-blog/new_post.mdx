@@ -1,0 +1,156 @@
+---
+title: 'Hướng dẫn tạo ứng dụng Slack với FastAPI'
+date: '2023-01-26'
+tags: ['slack', 'fastapi']
+draft: false
+summary: Ứng dụng Slack ngày càng trở thành một công cụ quan trọng trong việc quản lý và tương tác trong các nhóm làm việc. Trong blog này, chúng ta sẽ hướng dẫn cách tạo một ứng dụng Slack 
+ 
+
+---
+Tiêu đề: Hướng dẫn tạo ứng dụng Slack với FastAPI và Redirect URL
+
+---
+
+### Giới thiệu
+
+Ứng dụng Slack ngày càng trở thành một công cụ quan trọng trong việc quản lý và tương tác trong các nhóm làm việc. Trong blog này, chúng ta sẽ hướng dẫn cách tạo một ứng dụng Slack và gửi notification từ Be đến 1 channel bất kỳ (sử dụng FastAPI làm backend). 
+
+---
+
+### Bước 1: Tạo Ứng Dụng Slack
+
+Đầu tiên, bạn cần đăng nhập vào [Trang quản trị ứng dụng Slack](https://api.slack.com/apps) và tạo một ứng dụng mới.
+
+1. **Create New App**: Chọn "Create New App" và điền thông tin cơ bản cho ứng dụng của bạn.
+
+2. **Cấu hình Redirect URL**: Trong phần "OAuth & Permissions", thêm Redirect URL của ứng dụng FastAPI của bạn.
+
+    ```
+    https://your-fastapi-app.com/slack/redirect
+    ```
+
+---
+
+### Bước 2: Thiết Lập FastAPI Backend
+
+1. **Cài Đặt FastAPI và Uvicorn**:
+
+    ```bash
+    pip install fastapi uvicorn
+    ```
+
+2. **Tạo File FastAPI App**:
+
+    ```python
+    from fastapi import FastAPI, Depends, HTTPException
+    from fastapi.security import OAuth2AuthorizationCodeBearer
+    import slack_sdk
+
+    app = FastAPI()
+
+    # Cấu hình Slack OAuth
+    SLACK_CLIENT_ID = "your_slack_client_id"
+    SLACK_CLIENT_SECRET = "your_slack_client_secret"
+
+    slack_sdk.oauth_installation_store = ...
+
+    class SlackOAuthCallback(BaseModel):
+        code: str
+        state: str
+
+    @app.get("/slack/redirect")
+    async def slack_oauth_redirect(callback_data: SlackOAuthCallback = Depends(),
+                               db: Session = Depends(deps.get_db),):
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://slack.com/api/oauth.v2.access",
+                data={
+                    "code": callback_data.code,
+                    "client_id": client_id,
+                    "client_secret": client_secret
+                }
+            )
+
+            # Check if the request was successful
+            if response.status_code == 200:
+                response_data = response.json()
+                access_token = response_data.get("access_token")
+
+                # Lưu token vào db
+
+                # đóng cửa sổ auth của slack
+                return  HTMLResponse("""
+                    <html>
+                        <head>
+                            <title>FastAPI Open and Close Window</title>
+                            <link rel="stylesheet" href="/static/style.css">
+                        </head>
+                        <body>
+
+                            <script>
+                                window.close();
+                            </script>
+                        </body>
+                    </html>
+                    """)
+            return # trả về lỗi j đấy
+
+
+    ```
+
+    ### slack service
+
+    ```python
+
+
+    import httpx
+
+    class Slack:
+        def __init__(self,slack_token:str) -> None:
+            self.slack_token= slack_token
+
+
+
+        async def send_message(self,channel,message,bot_name=None,bot_icon=None,is_unfurl=None,markdn=False,):
+
+            async with httpx.AsyncClient() as client:
+                url = "https://slack.com/api/chat.postMessage"
+
+                payload = f'text={message}&channel={channel}&mrkdwn={markdn}&username={bot_name}&icon_url={bot_icon}'
+                headers = {
+                    'Authorization': f'Bearer {self.slack_token}',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+                await client.post(url, headers=headers, data=payload)
+
+        async def get_channels(self):
+
+            async with httpx.AsyncClient() as client:
+                url = "https://slack.com/api/conversations.list"
+
+                headers = {
+                'Authorization': f'Bearer {self.slack_token}'
+                }
+
+                response = await client.get( url, headers=headers)
+                return response.json()
+            
+    ```
+---
+
+### Bước 3: Phân Phối Ứng Dụng
+
+1. **scope app**:
+
+    nêu chọn chat.write.custom vì có thể thayd dổi username, icon của bot
+
+2. **Cấu Hình Distribution Public**:
+
+    Trong trang cấu hình ứng dụng Slack, chuyển đến phần "Manage Distribution" và chọn "Public Distribution".
+
+3. **Submit to App Directory**:
+
+    Điền đầy đủ thông tin yêu cầu và submit ứng dụng của bạn để xuất hiện trong App Directory của Slack.
+
+---
+
