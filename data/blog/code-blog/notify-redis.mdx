@@ -1,0 +1,145 @@
+---
+title: 'Hướng dẫn Sử dụng Redis Keyspace Notifications và Đặt Chỗ Ngồi trong Rạp Chiếu Phim với Python'
+date: '2024-06-14'
+tags: ['Redis','backend','python']
+draft: false
+summary:Redis Keyspace Notifications là một tính năng mạnh mẽ của Redis cho phép bạn nhận thông báo khi có sự thay đổi trên các keys trong database của mình. Trong hướng dẫn này, chúng ta sẽ tận dụng Redis Keyspace Notifications và một ví dụ nhỏ để triển khai hệ thống đặt chỗ ngồi trong rạp chiếu phim bằng Python.. 
+---
+
+**Hướng dẫn Sử dụng Redis Keyspace Notifications và Đặt Chỗ Ngồi trong Rạp Chiếu Phim với Python**
+
+Redis Keyspace Notifications là một tính năng mạnh mẽ của Redis cho phép bạn nhận thông báo khi có sự thay đổi trên các keys trong database của mình. Trong hướng dẫn này, chúng ta sẽ tận dụng Redis Keyspace Notifications và một ví dụ nhỏ để triển khai hệ thống đặt chỗ ngồi trong rạp chiếu phim bằng Python.
+
+#
+## notify keyspace events
+`notify-keyspace-events` là một tùy chọn cấu hình trong Redis cho phép bạn đăng ký các loại sự kiện cụ thể mà bạn muốn nhận thông báo. Khi được kích hoạt, Redis sẽ gửi thông báo cho các clients của mình khi có các sự kiện xảy ra trên các keys trong database.
+
+### Các Loại Sự Kiện
+
+Có một số loại sự kiện mà bạn có thể đăng ký để nhận thông báo:
+
+- `K`: Các sự kiện liên quan đến keyspace (các thay đổi trên keys).
+- `E`: Các sự kiện liên quan đến keyspace events (như đặt, xóa, hoặc hết hạn).
+- `g`: Các sự kiện liên quan đến keygroup (nhóm keys).
+- `$`: Các sự kiện liên quan đến stream (Redis Streams).
+
+### Các Mã Sự Kiện
+
+- `w`: Key được viết (write event).
+- `r`: Key được đọc (read event).
+- `e`: Key bị xóa (evict event).
+- `A`: Key được tự hủy do hết hạn (expired event).
+- `t`: Key được đặt lại vì đã hết hạn (touch event).
+
+### Cấu Trúc
+
+Mỗi mã sự kiện có thể được kết hợp với loại sự kiện để tạo thành một chuỗi thông báo. Ví dụ:
+
+- `KE`: Các sự kiện khi keyspace đó được viết hoặc đọc.
+- `K$`: Các sự kiện khi keyspace đó bị xóa hoặc hết hạn.
+
+### Đăng Ký
+
+Bạn có thể đăng ký các loại sự kiện bạn muốn nhận thông báo bằng cách sử dụng lệnh `CONFIG SET`:
+
+```bash
+CONFIG SET notify-keyspace-events "KEA"
+```
+
+Trong ví dụ này, Redis sẽ gửi thông báo cho các sự kiện write (viết) và expired (hết hạn) trên keyspace.
+
+### Ứng Dụng
+
+- Redis Keyspace Notifications rất hữu ích cho việc xây dựng các hệ thống phân tán và theo dõi sự thay đổi trên dữ liệu trong Redis.
+- Chúng thường được sử dụng trong việc xây dựng các hệ thống real-time analytics, message queuing systems, và các ứng dụng đồng bộ dữ liệu.
+
+### Lưu Ý
+
+- Việc đăng ký nhiều loại sự kiện có thể tạo ra một lượng lớn các thông báo, do đó cần cân nhắc khi đặt cấu hình.
+- Tính năng này chỉ có sẵn từ Redis 2.8.0 trở lên.
+
+#
+Phần 2 về triển khai ví dụ. 
+
+Ví dụ khi đặt vé xe thông qua các kênh online, Trên giao diện sẽ hiển thị các ghế với các trạng thái như: chưa ai đặt, đang giữ chỗ chờ thanh toán, đã đặt.
+Khi có một user click vào 1 ghế đang trống, ghế đó sẽ chuyển qua chế độ chờ thanh toán, và trong 1 khoảng thời gian nếu ghế đó chưa dc thanh toán, status sẽ tự update lại trạng thái chưa có ai đặt.
+
+Sử sụng notify keyspace events để xử lý vấn đề này.
+
+### Bước 1: Cài đặt Redis-py
+
+Trước tiên, hãy cài đặt thư viện redis-py để có thể làm việc với Redis trong Python:
+
+```bash
+pip install redis
+```
+
+### Bước 2: Triển khai hệ thống đặt chỗ ngồi
+
+Dưới đây là một ví dụ về cách triển khai hệ thống đặt chỗ ngồi trong rạp chiếu phim sử dụng Redis Keyspace Notifications:
+
+```python
+from fastapi import FastAPI, HTTPException
+import redis
+from enum import Enum
+
+app = FastAPI()
+
+# Kết nối tới Redis
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
+TTL = 2
+
+class SEAT_STATUS(Enum):
+    EMPTY = "empty"  # Ghế trống
+    BOOKED = "booked"  # Ghế đã đặt
+    PENDING_PAYMENT = "pending_payment"  # Ghế đang chờ thanh toán
+redis_client.config_set('notify-keyspace-events', 'Ex')
+
+@app.post("/book_seat")
+async def book_seat(seat_id: int):
+    if  redis_client.exists(f"seats:{seat_id}"):
+        raise HTTPException(400)
+
+    redis_client.set(f"seats:{seat_id}", SEAT_STATUS.PENDING_PAYMENT.value)
+    redis_client.set(f"seats:{seat_id}", 'EX', TTL)
+    return {"message": "Done"}
+
+```
+
+Trước tiên chúng ta có 1 api dùng để đặt chỗ ngồi, mỗi có request được call hệ thống sẽ kiểm tra xem ghế đó được đặt chưa, nếu còn trống thì sẽ đưa vào redis với expire trong 1 khoảng thời gian nào đó.
+```python
+# subscriber.py
+
+import redis
+
+def event_handler(msg): 
+    try:
+        key = msg["data"].decode("utf-8")
+        if "seats" in key:
+            key = key.replace("seats:", "")
+            value = conn.get(key)
+            process_message(value)
+            conn.delete(key)
+    except Exception as exp:
+        print("exp",exp)
+        pass
+
+def process_message(value):
+    # Insert your code below
+    print("Processing Message : ", value)
+
+
+conn = redis.Redis(host='localhost', port=6379, db=0)
+pubsub = conn.pubsub()
+
+conn.config_set('notify-keyspace-events', 'Ex')
+pubsub.psubscribe(**{"__keyevent@0__:expired": event_handler})
+pubsub.run_in_thread(sleep_time=0.01)
+
+print("Running : worker redis subscriber ...")
+```
+đây là đoạn code để lắng nghe các sự kiện hết hạn và xử lý.
+
+### Kết luận
+
+Trên đây là cách triển khai hệ thống đặt chỗ ngồi trong rạp chiếu phim bằng Python sử dụng Redis Keyspace Notifications. Bằng cách sử dụng tính năng này của Redis, bạn có thể hiệu quả quản lý việc đặt chỗ và xử lý các sự kiện khi ghế hết thời gian thanh toán.
