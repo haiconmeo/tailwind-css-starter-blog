@@ -1,0 +1,210 @@
+---
+title: 'Thiết kế rest api cho các task có thời gian xử lý dài'
+date: '2024-06-17'
+tags: ['fastapi', 'python']
+draft: false
+summary: A long-running task là một hoạt động đòi hỏi một lượng đáng kể tài nguyên máy chủ và/hoặc thời gian. Để tránh chặn client, task phải được hoàn thành một cách không đồng bộ mà không cần kết nối liên tục giữa client và server.
+---
+
+A long-running task là một hoạt động đòi hỏi một lượng đáng kể tài nguyên máy chủ và/hoặc thời gian. Để tránh chặn client, task phải được hoàn thành một cách không đồng bộ mà không cần kết nối liên tục giữa client và server.
+
+
+Sau khi gửi task, client cần request tới một URL được cung cấp để kiểm tra tiến trình thực hiện task. Nếu có hỗ trợ WebSockets, client cũng có thể được thông báo qua WebSockets khi việc thực thi hoàn tất, thay vì thăm dò.
+
+
+
+1\. Cách Tiếp Cận Chung cho Long-Running API
+-------------------------------------------
+
+Traditionally, all the APIs that support long-running operations are built with the following approach:
+
+![](https://restfulapi.net/wp-content/uploads/Long-Running-API.png)
+
+"**Resource Creation and Initiation**: Tạo một tài nguyên để đại diện cho việc khởi tạo một task dài hạn. Tài nguyên này có thể là một URI duy nhất mà các khách hàng có thể gửi yêu cầu POST để bắt đầu một task. Nội dung yêu cầu có thể bao gồm các tham số hoặc dữ liệu cần thiết để định nghĩa task.
+
+    POST /api/tasks
+    
+    Status: 202 Accepted
+    Location: /tasks/12345
+    Content-Type: application/json
+    {
+      "taskId": 12345,
+      "status": "pending",
+      "createdAt": "2023-11-04T10:00:00Z"
+    }
+
+**Task Status Resource**: Một khi task đã được gửi đi, tạo một tài nguyên để đại diện cho trạng thái hiện tại của task dài hạn. Tài nguyên này cho phép khách hàng kiểm tra tiến trình và kết quả của task. Chúng ta có thể tài liệu hóa các trạng thái có thể có của task để khách hàng có thể hành động phù hợp.
+
+    GET /api/tasks/12345
+    
+    Status: 200 OK
+    Content-Type: application/json
+    {
+      "taskId": 12345,
+      "status": "in progress",
+      "createdAt": "2023-11-04T10:00:00Z",
+      "progress": {
+        "percentage": 45,
+        "currentStep": "data transformation"
+      }
+    }
+"
+
+**Result Reporting**: "Một khi task hoàn thành, API này có thể trả về trạng thái “_Completed_” cùng với URI của kết quả chi tiết hoặc URI của tài nguyên mới được tạo, nếu có."
+
+    GET /api/tasks/12345
+    
+    Status: 200 OK
+    Content-Type: application/json
+    
+    {
+      "taskId": 12345,
+      "status": "completed",
+      "createdAt": "2023-11-04T10:00:00Z",
+      "completedAt": "2023-11-04T10:15:00Z",
+      "result": {
+        "newResource": "https://example.com/resources/123-456"
+      }
+    }
+
+2\. HTTP Status Code from Task Submission
+-----------------------------------------
+
+Khi một task dài hạn được gửi qua REST API, việc lựa chọn mã HTTP status sẽ khác nhau tùy thuộc vào nhiều yếu tố.
+
+http status
+
+Mô Tả
+
+**202 Accepted**
+
+Chỉ ra rằng yêu cầu đã được chấp nhận để xử lý, nhưng quá trình xử lý chưa hoàn tất. response có thể bao gồm một liên kết đến tài nguyên hoặc tiêu đề ‘_Location_’ nơi khách hàng có thể kiểm tra trạng thái của task.
+
+**303 See Other**
+
+Chỉ ra rằng khách hàng nên kiểm tra trạng thái của task dài hạn ở một vị trí khác (URI) được đề cập trong tiêu đề ‘_Location_’. Điều này hữu ích khi chúng ta muốn chuyển hướng khách hàng đến một tài nguyên nơi trạng thái task có thể được kiểm tra.
+
+http status phù hợp nhất để trả về từ một REST API dài hạn là HTTP 202 Accepted. Khi yêu cầu đã được chấp nhận, không có phương tiện nào để gửi lại http status từ hoạt động không đồng bộ đã gửi.
+
+Theo [RFC-9110](https://datatracker.ietf.org/doc/html/rfc9110#name-202-accepted) (thay thế [RFC-7231](https://datatracker.ietf.org/doc/html/rfc7231#section-6.3.3)), http status _202 (Accepted)_ chỉ ra rằng yêu cầu đã được chấp nhận để xử lý, nhưng quá trình xử lý chưa hoàn tất.
+
+Đại diện được gửi với mã _202_ nên mô tả trạng thái hiện tại của yêu cầu (thường là _submitted_) và tiêu đề `Location` đến một bộ giám sát trạng thái có thể cung cấp cho khách hàng ước tính về thời điểm yêu cầu sẽ được hoàn thành.
+
+3\. API Response Structure
+--------------------------
+
+response từ một API dài hạn nên chỉ chứa thông tin cần thiết về trạng thái hiện tại của task đã được gửi. Dưới đây là một ví dụ về API chấp nhận các script để chạy trên các thiết bị.
+
+    HTTP POST: /device-management/script-execution/new
+    
+    {
+      "device-ids": [1, 2, 3],
+      "script-url": "/temp/test-script.sh"
+    }
+
+response cho yêu cầu trên có thể như sau, trong đó _123456789_ là một số ngẫu nhiên biểu thị _id_ của task dài hạn đang tiến hành. Có thể có nhiều task như vậy đang thực thi trên máy chủ cùng một lúc.
+
+    HTTP Status 202
+    Location: /device-management/script-execution/123456789
+    
+    {
+      "device-ids": [1, 2, 3],
+      "script-url": "/temp/test-script.sh",
+      "status": "SUBMITTED"
+    }
+
+4\. Querying the Completion Status of Long-Running Task
+-------------------------------------------------------
+
+Sau khi task đã được gửi, khách hàng có thể gửi yêu cầu đến URL được cung cấp trong tiêu đề `Location` và nhận trạng thái hiện tại của task dài hạn. Một ví dụ về phản hồi có thể là:
+
+    HTTP GET: /device-management/script-execution/123456789
+    
+    {
+      "device-ids": [1, 2, 3],
+      "script-url": "/temp/test-script.sh",
+      "status": "INPROGRESS",
+      "percentage": "45%",
+    }
+
+Trạng thái hoàn thành và phần trăm của task có thể thay đổi dựa trên tiến trình thực thi. Chúng ta cũng có thể sử dụng các hằng số trạng thái và chỉ báo tiến trình khác, tùy thuộc vào yêu cầu của dự án.
+
+Khi task hoàn thành, nó có thể cung cấp kết quả thực thi task trong cùng một phản hồi, hoặc cung cấp một URL khác sẽ trả về kết quả thực thi task.
+
+    HTTP GET: /device-management/script-execution/123456789
+    
+    {
+      "device-ids": [1, 2, 3],
+      "script-url": "/temp/test-script.sh",
+      "status": "COMPLETE",
+      "percentage": "100%",
+      "result": {
+        "id": 123456789,
+        "sys-log-location":"/log/….",
+        "err-log-location":"/log/….",
+        "success-on-devices": [1, 2],
+        "failed-on-devices": [3]
+      }
+    }
+
+Ngoài ra, phản hồi trạng thái thực thi có thể trỏ đến một vị trí mới để truy cập kết quả.
+
+    HTTP GET: /device-management/script-execution/123456789
+    
+    {
+      "device-ids": [1, 2, 3],
+      "script-url": "/temp/test-script.sh",
+      "status": "COMPLETE",
+      "percentage": "100%",
+      "result": "/device-management/devices/execute-scripts/123456789/result"
+    }
+
+    HTTP GET: /device-management/script-execution/123456789/result
+    
+    {
+      "id": 123456789,
+      "sys-log-location":"/log/….",
+      "err-log-location":"/log/….",
+      "success-on-devices": [1, 2],
+      "failed-on-devices": [3]
+    }
+
+Ngoài ra, hãy xem xét sử dụng các hệ thống nhắn tin theo thời gian thực (như Apache Kafka) để xuất bản trạng thái task, điều này có thể thông báo cho khách hàng nếu họ đã đăng ký. Điều này thường phụ thuộc vào loại khách hàng:
+
+*   Một khách hàng API có thể đăng ký động đến URL của Topic trong tiêu đề Location, do đó chúng ta có thể sử dụng hàng đợi tin nhắn trong giao tiếp giữa HAI khách hàng API.
+*   Đối với giao tiếp giữa trình duyệt và API lưu trữ trên máy chủ, phản hồi kiểu REST đơn giản sẽ phù hợp hơn.
+
+5\. Canceling an In-Progress Task
+---------------------------------
+
+Một task có thể được gửi nhầm, vì vậy cần phải có cách để hủy task đó nhằm ngăn ngừa thiệt hại thêm cho hệ thống. Yêu cầu có thể bị hủy một phần hoặc toàn bộ. Các thay đổi do các task thực hiện, cho đến khi chúng bị hủy, có thể được duy trì hoặc quay lại. Tất cả các quyết định này phụ thuộc vào yêu cầu và khả năng của ứng dụng.
+
+Hoạt động hủy sẽ là idempotent.
+
+Khách hàng có thể gửi yêu cầu HTTP DELETE đến URL được cung cấp bởi tiêu đề _Location_ khi task được gửi. URL chứa task-id/execution-id nên có thể sử dụng để hủy.
+
+    HTTP DELETE "/device-management/script-execution/123456789"
+
+
+
+6\. Best Practices
+------------------
+
+Để triển khai một hệ thống xử lý task dài hạn hiệu quả qua API, cần tuân thủ các nguyên tắc sau:
+
+1. **Không chờ đợi task dài hạn hoàn thành trong quá trình xử lý yêu cầu HTTP thông thường**:
+    - task dài hạn sẽ được xử lý không đồng bộ, ngay sau khi yêu cầu được chấp nhận (HTTP 202 Accepted).
+
+2. **Cung cấp URL riêng để truy vấn trạng thái task**:
+    - Khách hàng sẽ sử dụng URL cung cấp trong tiêu đề `Location` để kiểm tra trạng thái hiện tại của task.
+
+3. **Cung cấp cơ chế để hủy task dài hạn**:
+    - Khách hàng có thể hủy task bằng cách gửi yêu cầu HTTP DELETE đến URL của task.
+
+4. **Quá trình thực thi task không phụ thuộc vào khách hàng**:
+    - task sẽ tiếp tục chạy ngay cả khi khách hàng không duy trì kết nối hoặc không gửi thêm yêu cầu.
+
+5. **Sử dụng trường tiêu đề `Retry-After` trong phản hồi API**:
+    - Để chỉ ra thời gian khách hàng nên chờ trước khi thử lại cùng yêu cầu, nếu yêu cầu trước đó không được chấp nhận vì lý do nào đó.
+
+
