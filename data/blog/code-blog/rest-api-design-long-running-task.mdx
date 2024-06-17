@@ -12,7 +12,6 @@ A long-running task là một hoạt động đòi hỏi một lượng đáng k
 Sau khi gửi task, client cần request tới một URL được cung cấp để kiểm tra tiến trình thực hiện task. Nếu có hỗ trợ WebSockets, client cũng có thể được thông báo qua WebSockets khi việc thực thi hoàn tất, thay vì thăm dò.
 
 
-
 1\. Cách Tiếp Cận Chung cho Long-Running API
 -------------------------------------------
 
@@ -20,21 +19,23 @@ Traditionally, all the APIs that support long-running operations are built with 
 
 ![](https://restfulapi.net/wp-content/uploads/Long-Running-API.png)
 
-"**Resource Creation and Initiation**: Tạo một tài nguyên để đại diện cho việc khởi tạo một task dài hạn. Tài nguyên này có thể là một URI duy nhất mà các khách hàng có thể gửi yêu cầu POST để bắt đầu một task. Nội dung yêu cầu có thể bao gồm các tham số hoặc dữ liệu cần thiết để định nghĩa task.
-
+**Resource Creation and Initiation**: Tạo một tài nguyên để đại diện cho việc khởi tạo một task dài hạn. Tài nguyên này có thể là một URI duy nhất mà các khách hàng có thể gửi yêu cầu POST để bắt đầu một task. Nội dung yêu cầu có thể bao gồm các tham số hoặc dữ liệu cần thiết để định nghĩa task.
+```
     POST /api/tasks
     
     Status: 202 Accepted
     Location: /tasks/12345
     Content-Type: application/json
+
     {
       "taskId": 12345,
-      "status": "pending",
+      status: "pending",
       "createdAt": "2023-11-04T10:00:00Z"
     }
+```
 
 **Task Status Resource**: Một khi task đã được gửi đi, tạo một tài nguyên để đại diện cho trạng thái hiện tại của task dài hạn. Tài nguyên này cho phép khách hàng kiểm tra tiến trình và kết quả của task. Chúng ta có thể tài liệu hóa các trạng thái có thể có của task để khách hàng có thể hành động phù hợp.
-
+```
     GET /api/tasks/12345
     
     Status: 200 OK
@@ -48,10 +49,10 @@ Traditionally, all the APIs that support long-running operations are built with 
         "currentStep": "data transformation"
       }
     }
-"
+```
 
 **Result Reporting**: "Một khi task hoàn thành, API này có thể trả về trạng thái “_Completed_” cùng với URI của kết quả chi tiết hoặc URI của tài nguyên mới được tạo, nếu có."
-
+```
     GET /api/tasks/12345
     
     Status: 200 OK
@@ -66,7 +67,7 @@ Traditionally, all the APIs that support long-running operations are built with 
         "newResource": "https://example.com/resources/123-456"
       }
     }
-
+```
 2\. HTTP Status Code from Task Submission
 -----------------------------------------
 
@@ -94,16 +95,16 @@ Theo [RFC-9110](https://datatracker.ietf.org/doc/html/rfc9110#name-202-accepted)
 --------------------------
 
 response từ một API dài hạn nên chỉ chứa thông tin cần thiết về trạng thái hiện tại của task đã được gửi. Dưới đây là một ví dụ về API chấp nhận các script để chạy trên các thiết bị.
-
+```
     HTTP POST: /device-management/script-execution/new
     
     {
       "device-ids": [1, 2, 3],
       "script-url": "/temp/test-script.sh"
     }
-
+```
 response cho yêu cầu trên có thể như sau, trong đó _123456789_ là một số ngẫu nhiên biểu thị _id_ của task dài hạn đang tiến hành. Có thể có nhiều task như vậy đang thực thi trên máy chủ cùng một lúc.
-
+```
     HTTP Status 202
     Location: /device-management/script-execution/123456789
     
@@ -112,12 +113,12 @@ response cho yêu cầu trên có thể như sau, trong đó _123456789_ là m�
       "script-url": "/temp/test-script.sh",
       "status": "SUBMITTED"
     }
-
+```
 4\. Querying the Completion Status of Long-Running Task
 -------------------------------------------------------
 
 Sau khi task đã được gửi, khách hàng có thể gửi yêu cầu đến URL được cung cấp trong tiêu đề `Location` và nhận trạng thái hiện tại của task dài hạn. Một ví dụ về phản hồi có thể là:
-
+```
     HTTP GET: /device-management/script-execution/123456789
     
     {
@@ -126,11 +127,11 @@ Sau khi task đã được gửi, khách hàng có thể gửi yêu cầu đến
       "status": "INPROGRESS",
       "percentage": "45%",
     }
-
+```
 Trạng thái hoàn thành và phần trăm của task có thể thay đổi dựa trên tiến trình thực thi. Chúng ta cũng có thể sử dụng các hằng số trạng thái và chỉ báo tiến trình khác, tùy thuộc vào yêu cầu của dự án.
 
 Khi task hoàn thành, nó có thể cung cấp kết quả thực thi task trong cùng một phản hồi, hoặc cung cấp một URL khác sẽ trả về kết quả thực thi task.
-
+```
     HTTP GET: /device-management/script-execution/123456789
     
     {
@@ -146,9 +147,9 @@ Khi task hoàn thành, nó có thể cung cấp kết quả thực thi task tron
         "failed-on-devices": [3]
       }
     }
-
+```
 Ngoài ra, phản hồi trạng thái thực thi có thể trỏ đến một vị trí mới để truy cập kết quả.
-
+```
     HTTP GET: /device-management/script-execution/123456789
     
     {
@@ -168,7 +169,7 @@ Ngoài ra, phản hồi trạng thái thực thi có thể trỏ đến một v�
       "success-on-devices": [1, 2],
       "failed-on-devices": [3]
     }
-
+```
 Ngoài ra, hãy xem xét sử dụng các hệ thống nhắn tin theo thời gian thực (như Apache Kafka) để xuất bản trạng thái task, điều này có thể thông báo cho khách hàng nếu họ đã đăng ký. Điều này thường phụ thuộc vào loại khách hàng:
 
 *   Một khách hàng API có thể đăng ký động đến URL của Topic trong tiêu đề Location, do đó chúng ta có thể sử dụng hàng đợi tin nhắn trong giao tiếp giữa HAI khách hàng API.
