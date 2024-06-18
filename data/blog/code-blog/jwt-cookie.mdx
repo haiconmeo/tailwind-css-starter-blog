@@ -1,0 +1,20 @@
+---
+title: 'Lưu JWT trong cookie hay local storage?'
+date: '2024-06-18'
+tags: ['jwt',]
+draft: false
+summary: 'Lưu JWT (JSON Web Token) trong cookie được coi là an toàn hơn so với lưu trong session storage hoặc local storage'
+---
+### Lưu JWT trong cookie hay local storage?
+
+Lưu JWT (JSON Web Token) trong cookie được coi là an toàn hơn so với lưu trong session storage hoặc local storage vì một số lý do sau:
+
+1. **Chống lại tấn công Cross-Site Scripting (XSS):** Cookie ít dễ bị tấn công XSS hơn so với session storage hoặc local storage. Tấn công XSS xảy ra khi một mã độc được tiêm vào website và có thể truy cập và thay đổi dữ liệu trong trình duyệt của người dùng. Với cờ HttpOnly, cookie không thể bị truy cập bởi mã JavaScript, giảm thiểu nguy cơ tấn công XSS.
+
+2. **Có thể cấu hình thời gian hết hạn:** Cookie có thể được cấu hình để tự động xóa sau một khoảng thời gian nhất định. Điều này có nghĩa là nếu kẻ tấn công có được JWT lưu trong cookie, token chỉ có giá trị trong một thời gian hạn chế, giảm thiểu nguy cơ thiệt hại lâu dài.
+
+3. **Chỉ gửi qua HTTPS:** Cookie có thể được cấu hình để chỉ gửi qua kênh HTTPS, cung cấp mã hóa và xác thực dữ liệu đang được truyền. Điều này giảm thiểu nguy cơ tấn công gián đoạn trung gian, nơi kẻ tấn công nghe lén và thay đổi dữ liệu giữa trình duyệt của người dùng và máy chủ.
+
+4. **Ít dễ bị tấn công Cross-Site Request Forgery (CSRF):** Session storage và local storage dễ bị tấn công CSRF hơn so với cookie. Tấn công CSRF xảy ra khi kẻ tấn công gửi yêu cầu từ trình duyệt của người dùng mà không có sự cho phép của họ. Vì session storage và local storage có thể bị truy cập bởi mã JavaScript, kẻ tấn công có thể đọc và gửi token JWT từ những cơ chế lưu trữ này, trong khi cookie ít dễ bị tấn công loại này.
+
+Tóm lại, lưu trữ JWT trong cookie với cờ HttpOnly và thời gian hết hạn được coi là an toàn hơn so với lưu trong session storage hoặc local storage. Tuy nhiên, cần lưu ý rằng cookie cũng không miễn dịch với các cuộc tấn công, và các biện pháp bảo mật khác như kiểm tra đầu vào, kiểm soát truy cập và giới hạn tốc độ cũng nên được triển khai để đảm bảo an toàn chung của ứng dụng.
