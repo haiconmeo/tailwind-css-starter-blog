@@ -1,0 +1,160 @@
+---
+title: 'Backend Developer Job Interview Questions — Redis'
+date: '2024-06-18'
+tags: ['redis']
+draft: false
+summary: Redis không chỉ hỗ trợ kiểu dữ liệu đơn giản là key-value, mà còn cung cấp lưu trữ cho các cấu trúc dữ liệu khác như danh sách .
+---
+
+Backend Developer Job Interview Questions — Redis
+============================================================
+
+![](https://miro.medium.com/v2/resize:fit:1400/1*SfPgaSQoXxz3ZXQ2SaPLFw.jpeg)
+
+**1\.** Những ưu điểm của Redis so với các cơ sở dữ liệu truyền thống
+----------------------------------------------------------------
+
+Redis không chỉ hỗ trợ kiểu dữ liệu đơn giản là key-value, mà còn cung cấp lưu trữ cho các cấu trúc dữ liệu khác như danh sách (list), tập hợp (set), zset, hash và nhiều cấu trúc khác. Hiệu suất của Redis cực kỳ cao, có thể đọc dữ liệu với tốc độ 110.000 lần/giây và ghi dữ liệu với tốc độ 81.000 lần/giây. Redis cũng có những tính năng hữu ích như publish/subscribe, thông báo và hết hạn khóa. Một ưu điểm khác của Redis là Redis chạy trong bộ nhớ nhưng có thể được lưu trữ lên đĩa. Các thao tác trên bộ nhớ đệm trong bộ nhớ của Redis cho phép công việc của CPU ít tốn kém hơn.
+
+**2\.** Điều gì xảy ra khi Redis hết bộ nhớ?
+---------------------------------------
+
+Nếu Redis đạt đến dung lượng lưu trữ tối đa đã được cấu hình, một thao tác ghi sẽ trả về thông báo lỗi (nhưng thao tác đọc vẫn sẽ trả về bình thường). Ngoài ra, chúng ta cũng có thể cấu hình Redis để loại bỏ dữ liệu cũ trong khi ghi dữ liệu mới vào cơ sở dữ liệu.
+
+**3\.** Mô hình sao chép master-slave trong cụm Redis là gì?
+--------------------------------------------------------
+
+Để đảm bảo cụm vẫn hoạt động khi một số nút gặp sự cố hoặc phần lớn các nút không thể giao tiếp, cụm sử dụng mô hình sao chép master-slave. Mỗi nút sẽ có N-1 bản sao.
+
+**4\.** Các vấn đề hiệu suất phổ biến của Redis và giải pháp
+--------------------------------------------------------
+
+1. Để đảm bảo tốc độ sao chép master-slave và tính ổn định của kết nối, master và slave nên ở trên cùng một mạng.
+2. Tránh cấu trúc đồ thị master-slave càng nhiều càng tốt. Thực tiễn tốt nhất là sử dụng danh sách liên kết đơn hướng như Master ``` <- Slave1 <- Slave2 <- Slave3…   ``` Điều này đảm bảo khi master gặp sự cố, Slave1 sẽ ngay lập tức thay thế master và các phần còn lại vẫn giữ nguyên.
+3. Tốt nhất không nên viết snapshot bộ nhớ cho Master. Nếu Master viết snapshot bộ nhớ, lệnh save sẽ lên lịch hàm rdbSave, điều này sẽ chặn công việc của luồng chính. Khi snapshot tương đối lớn, ảnh hưởng đến hiệu suất sẽ rất lớn và dịch vụ sẽ bị tạm dừng ngắt quãng.
+
+**5\.** Các cách để xóa các khóa hết hạn trong Redis
+-----------------------------------------------
+
+**1) Sử dụng bộ hẹn giờ**  
+Khi thiết lập thời gian hết hạn cho khóa, tạo một bộ hẹn giờ. Để bộ hẹn giờ thực hiện thao tác xóa khóa ngay khi khóa hết hạn.
+
+**2) Xóa lười (Lazy deletion)**  
+Để khóa tự hết hạn. Mỗi khi chúng ta truy vấn một khóa, kiểm tra xem khóa đó đã hết hạn chưa. Nếu đã hết hạn, xóa khóa đó. Nếu chưa, trả về khóa.
+
+**3) Xóa định kỳ (Periodic deletion)**  
+Chương trình kiểm tra cơ sở dữ liệu Redis theo các khoảng thời gian đều đặn và xóa các khóa đã hết hạn.
+
+**6\.** Nguyên tắc của cụm Redis
+---------------------------
+
+1. Redis Sentinel tập trung vào tính khả dụng cao. Khi master gặp sự cố, nó sẽ tự động nâng cấp slave thành master và tiếp tục cung cấp dịch vụ.
+2. Redis Cluster tập trung vào khả năng mở rộng. Khi bộ nhớ của một Redis đơn lẻ không đủ, Cluster được sử dụng để lưu trữ phân mảnh.
+
+**7\.** Ưu và nhược điểm của việc so sánh Jedis và Redisson
+-------------------------------------------------------
+
+Cả Jedis và Redisson đều là các khách hàng Java cho Redis. Jedis gần như không có phụ thuộc nào trong khi Redisson yêu cầu Netty, JCache API, và Project Reactor làm các phụ thuộc cơ bản. Jedis là một driver cấp thấp cung cấp API, hỗ trợ toàn diện hơn cho các lệnh Redis. Redisson triển khai các cấu trúc dữ liệu phân tán và có thể mở rộng. So với Jedis, Redisson có các chức năng đơn giản hơn và giúp nhà phát triển tập trung vào logic nghiệp vụ. Các instance của Jedis client không an toàn với luồng (thread-safe) nên chúng yêu cầu kết nối pooling (mỗi luồng gọi một instance Jedis). API của Redisson tự nó an toàn với luồng và yêu cầu ít tài nguyên hơn.
+
+**8\.** Cách thiết lập thời gian hết hạn và hiệu lực vĩnh viễn của khóa Redis
+------------------------------------------------------------------------
+
+Các lệnh EXPIRE và PERSIST.
+
+**9\.** Các lệnh liên quan đến giao dịch Redis
+-----------------------------------------
+
+Các lệnh MULTI, EXEC, DISCARD, WATCH.
+
+**10\.** Redis tối ưu hóa bộ nhớ như thế nào?
+----------------------------------------
+
+Sử dụng các hash càng nhiều càng tốt. Bộ nhớ được sử dụng bởi các bảng băm (nghĩa là số lượng được lưu trữ trong bảng băm nhỏ) là rất nhỏ, do đó bạn nên trừu tượng hóa mô hình dữ liệu của mình thành một bảng băm càng nhiều càng tốt. Ví dụ, nếu bạn có một đối tượng người dùng trong hệ thống web của mình, không nên thiết lập các khóa riêng biệt cho tên, họ, địa chỉ email và mật khẩu của người dùng. Thay vào đó, bạn nên lưu trữ tất cả thông tin của người dùng trong một bảng băm.
+
+
+
+**11\.** Redis cung cấp hai cơ chế lưu trữ nào?
+--------------------------------------------
+
+**1) RDB (Redis Database)**
+RDB là viết tắt của Redis Database files. Redis cung cấp các bản snapshot của tập dữ liệu tại các khoảng thời gian xác định.
+
+**Ưu điểm:**
+- RDB là một tệp đơn lẻ, nhỏ gọn, đại diện cho dữ liệu Redis tại một thời điểm cụ thể, điều này làm cho nó hoàn hảo cho việc sao lưu. Chúng ta có thể lưu trữ chúng định kỳ trong một khoảng thời gian dài. Điều này cho phép dễ dàng lưu trữ các phiên bản khác nhau của tập dữ liệu.
+- RDB tốt cho việc khôi phục sau thảm họa.
+- RDB cho phép khởi động lại nhanh hơn với các tập dữ liệu lớn so với AOF.
+- RDB sử dụng quy trình con để thực hiện việc lưu trữ dữ liệu, điều này không ảnh hưởng đến các hoạt động đang diễn ra bởi các quy trình cha.
+
+**Nhược điểm:**
+- Các tệp RDB lưu trữ dữ liệu giữa các điểm thời gian. Nếu Redis bị ngừng hoạt động giữa các điểm thời gian lưu trữ, sẽ có sự mất mát dữ liệu mới nhất. Do đó, RDB phù hợp hơn với các trường hợp mà yêu cầu về độ chính xác của dữ liệu không quá cao.
+
+**2) AOF (Append-Only File)**
+Cơ chế lưu trữ thứ hai là AOF (Append-Only File). AOF ghi lại mỗi lệnh ghi nhận vào Redis theo thứ tự chúng được nhận, giúp đảm bảo rằng không có dữ liệu nào bị mất.
+
+**Ưu điểm:**
+- AOF cung cấp sự bền vững cao hơn so với RDB, vì nó có thể được cấu hình để ghi lại mỗi lệnh ghi ngay lập tức hoặc định kỳ sau mỗi khoảng thời gian nhất định.
+- AOF lưu lại các lệnh ở dạng có thể đọc được, giúp dễ dàng hơn trong việc khôi phục và kiểm tra.
+
+**Nhược điểm:**
+- AOF thường lớn hơn và chậm hơn so với RDB do ghi nhiều lệnh vào tệp.
+- Quá trình khôi phục từ AOF có thể chậm hơn so với RDB khi khởi động lại Redis, đặc biệt với các tập dữ liệu lớn.
+
+
+**12\.** Mô tả một số kịch bản mà Redis phù hợp để sử dụng
+---------------------------------------------------
+
+**1) Publish & Subscribe**  
+Sử dụng tính năng publish & subscribe của Redis, chúng ta có thể sử dụng nó trong mạng xã hội và thiết lập hệ thống trò chuyện.
+
+**2) Bộ nhớ cache phiên (Session cache)**  
+Redis cung cấp khả năng lưu trữ dữ liệu để dữ liệu phiên có thể được truy xuất, ví dụ, trong trường hợp mất thông tin giỏ hàng của người dùng.
+
+**3) Bộ nhớ đệm toàn trang (Full Page Cache)**  
+Do tính năng lưu trữ trên đĩa, tốc độ tải toàn trang sẽ được cải thiện đáng kể.
+
+**4) Hàng đợi (Queue)**  
+Redis cung cấp các thao tác danh sách và tập hợp có thể được sử dụng cho các hàng đợi tin nhắn. Có những dự án mã nguồn mở có thể sử dụng để triển khai hàng đợi Redis. Một ví dụ là Celery, sử dụng Redis như một broker.
+
+**5) Bảng xếp hạng/ Bộ đếm (Leaderboard/Counter)**  
+Redis có các thao tác tăng và giảm. Các tập hợp và tập hợp có thứ tự cũng cho phép các thao tác dễ dàng hơn.
+
+**13\.** Cách thực hiện lưu trữ phiên chia sẻ trong một cụm
+--------------------------------------------------------
+
+Một cụm chứa nhiều instance máy chủ. Thông tin của một phiên có thể không nhất quán giữa các instance. Ví dụ, khi người dùng đăng nhập, thông tin phiên được lưu trữ trên instance A. Nếu người dùng duyệt các trang khác và instance B xử lý yêu cầu, phiên đăng nhập trước đó không được truyền đến B và người dùng sẽ được yêu cầu đăng nhập lại. Chúng ta có thể khắc phục điều này theo 3 cách:
+
+**1) Phiên dính (Sticky session)**  
+Chuyển tiếp tất cả các yêu cầu của cùng một người dùng đến cùng một máy chủ mỗi lần — ràng buộc người dùng với máy chủ.
+
+**2) Sao chép phiên giữa các máy chủ (Server session replication)**  
+Mỗi khi một phiên thay đổi, phát sóng thông tin đó đến tất cả các máy chủ trong cụm.
+
+**3) Lưu trữ phiên (Session Persistence)**  
+Lưu trữ phiên trong cơ sở dữ liệu.
+
+**14\.** Cách sử dụng Redis như một hàng đợi không đồng bộ
+----------------------------------------------------
+
+Chúng ta thường sử dụng cấu trúc List như một hàng đợi, với _rpush_ để sản xuất thông điệp và _lpop_ để tiêu thụ thông điệp. Khi không có thông điệp nào để tiêu thụ, chúng ta có thể sử dụng lệnh _blpop_ để kết nối client sẽ bị chặn cho đến khi có thông điệp mới được đẩy vào danh sách.
+
+**15\.** Bạn có hiểu về cơ chế đồng bộ hóa của Redis không?
+-------------------------------------------------------
+
+Redis sử dụng đồng bộ hóa master-slave và slave-slave. Trong quá trình đồng bộ hóa đầu tiên, nút master thực hiện lệnh _bgsave_ và ghi lại các thao tác sửa đổi tiếp theo vào bộ nhớ đệm. Sau khi hoàn thành, tệp RDB được đồng bộ hóa đến nút sao chép. Sau khi nút sao chép chấp nhận hoàn thành, hình ảnh RDB được tải vào bộ nhớ. Nút master được thông báo để đồng bộ hóa các bản ghi thao tác trong khoảng thời gian đó đến nút sao chép để thực hiện lại, và quá trình đồng bộ hóa được hoàn tất.
+
+**16\.** Các cụm Redis được sao chép như thế nào?
+---------------------------------------------
+
+Sao chép không đồng bộ (Asynchronous replication).
+
+**17\.**. What do you understand about a Redis transaction?
+------------------------------------------------------
+
+Redis transaction là một tập hợp các lệnh Redis. Một giao dịch là nguyên tử, có nghĩa là hoặc tất cả các lệnh trong giao dịch được thực thi hoặc không có lệnh nào được thực thi.
+
+
+Credits:  
+[https://zhuanlan.zhihu.com/p/276371544](https://zhuanlan.zhihu.com/p/276371544)  
+[https://www.fullstack.cafe/blog/redis-interview-questions](https://www.fullstack.cafe/blog/redis-interview-questions)  
+[https://redis.io/topics/persistence](https://redis.io/topics/persistence)  
+[https://docs.redis.com/latest/rs/administering/database-operations/eviction-policy/](https://docs.redis.com/latest/rs/administering/database-operations/eviction-policy/)
