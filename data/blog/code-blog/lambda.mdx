@@ -1,0 +1,96 @@
+---
+title: 'Mọi Điều Bạn Cần Biết Về Lambda Cold Start!'
+date: '2024-06-20'
+tags: ['serverless', 'lambda']
+draft: false
+summary: Điều đầu tiên xảy ra khi bạn thực thi một hàm Lambda là một môi trường Linux host được khởi động, và sau đó mã xử lý của chúng ta sẽ được gọi. Giả sử rằng Java được sử dụng để viết hàm lambda. Giữa hai nhiệm vụ đó, cả Lambda Java Runtime và JVM sẽ được khởi động. 
+---
+
+Mọi Điều Bạn Cần Biết Về Lambda Cold Start!
+==========================================
+
+Điều đầu tiên xảy ra khi bạn thực thi một hàm Lambda là một môi trường Linux host được khởi động, và sau đó mã xử lý của chúng ta sẽ được gọi. Giả sử rằng Java được sử dụng để viết hàm lambda. Giữa hai nhiệm vụ đó, cả Lambda Java Runtime và JVM sẽ được khởi động. Ngoài ra, code của chúng ta cũng sẽ được load. Tùy thuộc vào tính chất của hàm Lambda của chúng ta, có thể sẽ có thêm nhiều sự kiện khác xảy ra. Kết hợp lại, những hành động này tạo thành cái được gọi là "cold start". Nó xây dựng một phiên bản mới của runtime, môi trường xử lý và code xử lý sự kiện cho hàm Lambda của chúng ta.
+
+![](https://miro.medium.com/v2/resize:fit:1400/1*Px_Wx5NmqdnEn0GdzCFw7g.png)
+
+Điều quan trọng cần nhớ là không có gì xảy ra trước khi code Lambda của chúng ta được gọi. Nói cách khác, Lambda tạo các phiên bản hàm bất cứ khi nào cần thiết, không chỉ khi code Lambda có sẵn.
+
+Tuy nhiên, cold start là hiếm và không xảy ra mỗi lần hàm của chúng ta được gọi. Điều này là vì không phải mọi sự kiện gọi hàm của chúng ta đều thường xuyên dẫn đến một cold start từ Lambda. Điều này cho phép Lambda kết thúc phiên bản khi hàm của chúng ta hoàn thành và để nó chạy trong trường hợp có điều gì đó mới xuất hiện ngay sau đó. Nếu một sự kiện sắp xảy ra, phiên bản sẽ được “rã đông” và được gọi cùng với sự kiện đó. Mặc dù cold start hiếm khi xảy ra, chiếm ít hơn 1% thời gian đối với nhiều hàm Lambda, nhưng việc biết khi nào chúng xảy ra vẫn hữu ích.
+
+Làm Thế Nào Để Xác Định Cold Starts?
+====================================
+
+Khi không có đối tượng hàm nào sẵn sàng để xử lý một sự kiện, cần có một cold start. Điều này xảy ra vào các thời điểm sau:
+
+1. Khi code hoặc cài đặt của một hàm Lambda thay đổi, như khi phiên bản đầu tiên của hàm được xuất bản
+2. Khi tất cả các phiên bản trước đó đã kết thúc vì không được sử dụng trong một thời gian
+3. Khi tất cả các phiên bản trước đó đã bị “thu hoạch” vì quá cũ
+4. Khi Lambda cần tăng số lượng phiên bản vì tất cả các phiên bản hiện tại của hàm cần thiết đều đang xử lý các sự kiện
+
+Làm thế nào bạn có thể biết được khi nào đã có một cold start? Có nhiều cách để làm điều đó, nhưng đây là một số cách.
+
+Đầu tiên, bạn sẽ thấy sự gia tăng độ trễ. Nếu hàm của bạn có nhiều thành phần khác nhau, cold start có thể thêm từ 100 mili giây đến 10 giây vào độ trễ của hàm. Vì vậy, nếu hàm của bạn thường mất ít hơn khoảng thời gian đó, các phép đo độ trễ sẽ giúp bạn dễ dàng phát hiện ra một cold start.
+
+Tiếp theo, bạn có thể nhận ra khi nào đã xảy ra một cold start dựa vào cách Lambda ghi nhật ký. CloudWatch Logs lưu trữ kết quả của các hàm Lambda khi chúng ghi nhật ký. Một nhóm nhật ký CloudWatch lưu trữ tất cả dữ liệu nhật ký cho một hàm cụ thể. Tuy nhiên, mỗi phiên bản của một hàm sẽ ghi vào một luồng nhật ký khác nhau trong nhóm nhật ký. Vì vậy, bạn sẽ biết đã có một cold start khi thấy số lượng luồng nhật ký trong một nhóm nhật ký tăng lên.
+
+![](https://miro.medium.com/v2/resize:fit:1400/1*bH0lO9IWUwHCpyK2v6mz2A.png)
+
+Tác Động của Cold Starts là gì?
+==============================
+
+Chúng ta đã nói về cold starts là gì, khi nào chúng xảy ra và cách phát hiện chúng. Nhưng tại sao bạn nên quan tâm đến cold starts?
+
+Ở trên, chúng ta đã nói về cách phát hiện cold start bằng cách nhìn thấy sự tăng đột biến trong độ trễ của việc xử lý sự kiện của bạn. Đây thường là lý do tại sao mọi người lo lắng về chúng. Độ trễ từ đầu đến cuối cho một hàm Lambda nhỏ có thể là 50 ms trong điều kiện bình thường. Tuy nhiên, một cold start có thể thêm ít nhất 200 ms vào thời gian này, và dựa trên nhiều yếu tố, nó có thể thêm vài giây hoặc thậm chí hàng chục giây. Có sự trì hoãn thêm với cold starts vì tất cả các bước cần được thực hiện để tạo ra một phiên bản hàm.
+
+Điều này có nghĩa là chúng ta nên luôn lo lắng về cold starts không? Điều đó rất phụ thuộc vào những gì hàm Lambda của bạn làm.
+
+Vậy, giả sử hàm của bạn đang xử lý các đối tượng được tạo trong S3 một cách không đồng bộ, và bạn không chắc liệu nó có mất vài phút để xử lý các đối tượng này hay không. Trong trường hợp này, bạn có quan tâm đến cold starts không? Rất có thể là không. Đặc biệt là vì S3 không hứa hẹn gửi các sự kiện trong chưa đầy một giây.
+
+![](https://miro.medium.com/v2/resize:fit:1400/1*p2gcTw1j5YOY9QOpfdpyyQ.png)
+
+Giảm Thiểu Cold Starts
+======================
+
+Khi chúng ta sử dụng Lambda, cold starts sẽ luôn xảy ra, và nếu chúng ta không sử dụng Provisioned Concurrency, những cold starts này sẽ luôn đôi khi làm chậm hàm của chúng ta. Nếu cold starts gây phiền phức cho bạn, có một số điều bạn có thể làm để giảm thiểu tác động của chúng. Tuy nhiên, hãy chắc chắn rằng chúng thực sự gây rắc rối cho bạn. Giống như với các nhiệm vụ tối ưu hóa tốc độ khác, bạn chỉ nên làm công việc này nếu nó thực sự cần thiết.
+
+Tối Ưu Hóa Kích Thước Artifact
+------------------------------
+
+Cắt giảm kích thước của code artifact thường là cách tốt nhất để giảm tác động của cold start. Có hai cách chính để làm điều đó:
+
+1. Giới hạn lượng code của riêng chúng ta trong artifact chỉ những gì hàm Lambda thực sự cần.
+2. Loại bỏ các phụ thuộc không cần thiết sẽ giúp hàm Lambda chỉ lưu trữ các công cụ cần thiết.
+
+Sử Dụng Định Dạng Đóng Gói Tốt Hơn
+----------------------------------
+
+AWS khuyến nghị sử dụng định dạng ZIP để đóng gói một hàm Lambda, thay vì định dạng uberjar, vì nó giảm thời gian Lambda cần để giải nén code artifact của bạn.
+
+Sử dụng ngôn ngữ và runtime nhẹ
+----------------------------------
+
+Một số ngôn ngữ và runtime có thời gian khởi động nhanh hơn những ngôn ngữ khác. Ví dụ, Node.js và Python thường có thời gian khởi động nhanh hơn so với Java hoặc .NET. Nếu có thể, chọn ngôn ngữ và runtime có thời gian khởi động nhanh hơn có thể giảm thiểu tác động của cold start.
+
+Sử dụng Provisioned Concurrency
+----------------------------------
+
+Provisioned Concurrency giữ cho các phiên bản hàm của bạn luôn sẵn sàng để xử lý yêu cầu, do đó giảm thiểu thời gian chờ đợi khi có cold start. Tuy nhiên, giải pháp này có chi phí bổ sung và chỉ nên được sử dụng nếu yêu cầu của bạn thực sự cần thiết.
+
+Sử dụng cơ chế giữ ấm (warming)
+-------------------------------
+
+Bạn có thể triển khai cơ chế giữ ấm bằng cách gửi các yêu cầu không load định kỳ đến hàm Lambda của bạn để giữ cho các phiên bản hàm luôn trong trạng thái sẵn sàng. Tuy nhiên, cần lưu ý rằng phương pháp này có thể làm tăng chi phí nếu không được quản lý tốt.
+
+Improve startup logic
+---------------------
+
+Việc tạo hoặc load các tài nguyên khác nhau khi hàm Lambda được gọi lần đầu tiên là một trường hợp sử dụng khá phổ biến. Để xử lý các sự kiện trong suốt vòng đời của phiên bản nhanh hơn, một số hàm có thể tận dụng cơ hội này để xây dựng một bộ nhớ đệm cục bộ lớn được load từ các tài nguyên khác.
+
+Tuy nhiên, logic khởi động như vậy đi kèm với một chi phí và kéo dài thời gian cold start. Bạn có thể phải lựa chọn giữa việc rút ngắn thời gian thực thi của lần gọi đầu tiên và cải thiện hiệu suất của các lần gọi sau nếu bạn đang load các tài nguyên ban đầu trong cold start. Nếu có thể, bạn có thể cân nhắc “hâm nóng” bộ nhớ đệm cục bộ của hàm của bạn qua một vài lần gọi đầu tiên.
+
+Choose your language wisely
+---------------------------
+
+Việc lựa chọn runtime ngôn ngữ là một yếu tố khác có thể ảnh hưởng đến thời gian cold start. Nói một cách đơn giản, việc khởi động JavaScript, Python và Go mất ít thời gian hơn so với khởi động JVM hoặc .NET runtime. Do đó, tất cả các yếu tố khác đều bằng nhau, bạn có thể ưu tiên sử dụng JavaScript, Python hoặc Go thay vì Java nếu bạn đang viết một hàm ngắn không được sử dụng thường xuyên và bạn quan tâm đến việc giảm thiểu tác động của cold start càng nhiều càng tốt.
+
+Mọi người thường bỏ qua JVM và .NET runtimes như các runtimes của Lambda nói chung vì sự khác biệt trong thời gian khởi động này, nhưng đây là một quan niệm sai lầm. Ví dụ, nếu hàm JVM mất trung bình 80 ms để xử lý một sự kiện trong kịch bản xử lý Kinesis, trong khi phiên bản JavaScript mất 120 ms? Vì thời gian Lambda tính phí được làm tròn đến 100 ms tiếp theo, trong kịch bản này, bạn sẽ phải trả gấp đôi cho phiên bản JavaScript của code của bạn để thực thi. JavaScript có thể không phải là lựa chọn runtime tốt nhất trong trường hợp này.
