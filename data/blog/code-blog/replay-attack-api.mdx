@@ -1,0 +1,143 @@
+---
+title: 'Replay Attack là gì và cách ngăn chặn'
+date: '2024-06-27'
+tags: ['redis','nonce','python','fastapi']
+draft: false
+summary: Replay attack là một hình thức tấn công mạng trong đó kẻ tấn công ghi lại lưu lượng dữ liệu hợp lệ và sau đó sử dụng lại để thực hiện các hành động gian lận hoặc xâm nhập vào hệ thống một cách trái phép.
+---
+
+### Replay Attack là gì và cách ngăn chặn
+
+### 1. Replay attack là gì?
+
+**Replay attack** là một hình thức tấn công mạng trong đó kẻ tấn công ghi lại lưu lượng dữ liệu hợp lệ và sau đó sử dụng lại để thực hiện các hành động gian lận hoặc xâm nhập vào hệ thống một cách trái phép. Thông thường, các tấn công này xảy ra trong các hệ thống yêu cầu xác thực hoặc xác nhận truy cập qua mạng.
+
+### 2. Cách Replay attack hoạt động?
+
+- **Ghi lại dữ liệu**: Kẻ tấn công bắt đầu bằng việc ghi lại các gói tin dữ liệu hợp lệ giữa người dùng và hệ thống, chẳng hạn như các yêu cầu đăng nhập, giao dịch tài chính, hoặc các yêu cầu cần xác thực.
+Ở đây kể tấn công có thể copy curl của request đến server, trong url có các thông tin session login hiện tại, jwt,..
+
+- **Replay dữ liệu**: Sau khi ghi lại, kẻ tấn công có thể replay các gói tin này mà không cần biết thông tin xác thực (như mật khẩu) hoặc giao thức bảo mật. 
+
+
+- **Thực hiện các hành động gian lận**: Bằng cách replay dữ liệu, kẻ tấn công có thể đăng nhập vào tài khoản của người dùng, thực hiện các giao dịch tài chính hoặc thậm chí xâm nhập vào hệ thống một cách trái phép.
+
+### 3. Các biện pháp bảo vệ chống lại Replay attack
+
+**a. Sử dụng Nonce và Timestamps:**
+   - **Nonce** (Number Used Once): Sử dụng số duy nhất chỉ dùng một lần để đảm bảo mỗi yêu cầu là duy nhất và không thể tái sử dụng.
+   - **Timestamps**: Sử dụng dấu thời gian để đảm bảo rằng mỗi yêu cầu chỉ có hiệu lực trong một khoảng thời gian nhất định.
+
+**b. Sử dụng HMAC (Hash-based Message Authentication Code):**
+   - Sử dụng HMAC để tạo chữ ký số dựa trên dữ liệu yêu cầu và khóa bí mật, đảm bảo tính toàn vẹn và xác thực của dữ liệu gửi đi.
+
+**c. Xác thực và ủy quyền nghiêm ngặt:**
+   - Áp dụng các phương pháp xác thực nghiêm ngặt như JWT (JSON Web Token) hoặc OAuth để xác nhận danh tính người dùng và phân quyền truy cập.
+
+**d. Quản lý thời gian hết hạn và phiên làm việc:**
+   - Đảm bảo rằng các phiên làm việc (session) và các yêu cầu chỉ có thời gian hết hạn ngắn để giảm thiểu khả năng bị Replay attack.
+
+### Ví dụ
+
+Các bước thực hiện sẽ như sau:
+1. Frontend tạo ra 1 từ khóa nonce ngẫu nhiên (thường là session_id)
+
+2. frontend call api lấy timestamp của server
+
+3. Frontend tạo 
+    
+    signature_x = sha256(secret_key, nonce+timestamp)
+    url=...?nonce=nonce_x&timespace=timestanp_x&signature=signature_x
+
+4. Backend validate các dữ liệu FE trả bề
+    - check nonce có trong hệ thống hay không
+    - check timestamp so với thời điểm hiện tại còn hợp lệ hay không
+    - check signature sau khi mã hóa và signature do FE truyền về có giống nhau không.
+
+
+code example:
+
+```python
+
+#signature.py
+from functools import wraps
+from fastapi import HTTPException, Request
+from typing import Callable
+from time import time
+from hashlib import sha256
+import hmac
+
+import redis
+
+NONCE_EXPIRATION_TIME = 60  # seconds
+TIMESTAMP_EXPIRATION_TIME = 60  # seconds
+
+SECRET_KEY = "your_secret_key"  # Secret key for HMAC
+
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
+
+
+def validate_nonce(nonce: str):
+    check_nonce = redis_client.get(nonce)
+    if check_nonce:
+        raise HTTPException(status_code=400, detail="Nonce already used")
+    redis_client.set(nonce,'',ex=NONCE_EXPIRATION_TIME)
+
+def validate_timestamp(timestamp: int):
+    current_time = int(time())
+    if abs(current_time - timestamp) > TIMESTAMP_EXPIRATION_TIME:
+        raise HTTPException(status_code=400, detail="Invalid timestamp")
+
+def generate_signature(secret: str, data: str) -> str:
+    return hmac.new(secret.encode(), data.encode(), sha256).hexdigest()
+
+def secure_request(f: Callable) -> Callable:
+    @wraps(f)
+    async def wrapper(request: Request, *args, **kwargs):
+        params = request.query_params._dict
+        print(params)
+        nonce = params.get("nonce")
+        timestamp = int(params.get("timestamp"))
+        signature = params.get("signature")
+
+        if not nonce or not timestamp or not signature:
+            raise HTTPException(status_code=400, detail="Missing required fields")
+
+        validate_nonce(nonce)
+        validate_timestamp(timestamp)
+
+        expected_signature = generate_signature(SECRET_KEY, f"{nonce}{timestamp}")
+        if not hmac.compare_digest(expected_signature, signature):
+            raise HTTPException(status_code=400, detail="Invalid signature")
+
+        return await f(request, *args, **kwargs)
+
+    return wrapper
+
+
+```
+
+
+
+```python
+#api
+async def common_filter_parameters(
+    nonce:str,
+    timestamp:str,
+    signature:str
+):
+    return {'nonce':nonce, 'timestamp':timestamp, 'signature':signature}
+
+@app.get('/users')
+@secure_request
+def get_user(request: Request,params: str = Depends(common_filter_parameters) ):
+
+    fake_user = {'id':1,'name':'haiconmeo'}
+    return fake_user
+
+
+```
+
+Kết Luận:
+
+Việc hiểu và áp dụng các biện pháp phòng ngừa Replay attack là một phần quan trọng trong việc xây dựng các ứng dụng và hệ thống mạng an toàn và tin cậy. Bằng cách chủ động và thường xuyên cập nhật các biện pháp bảo mật, chúng ta có thể giảm thiểu rủi ro và bảo vệ thông tin của người dùng một cách tốt nhất.

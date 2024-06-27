@@ -1,1 +1,1 @@
-{"superset":1,"fastapi":7,"pubsub":1,"python":9,"backend":7,"kafka":2,"async":2,"gil":1,"docker":1,"slack":1,"postgres":1,"lock":1,"mongodb":1,"nlp":1,"sematic-search":1,"golang":1,"node":1,"wrapper":1}
+{"superset":1,"database":1,"fastapi":9,"pubsub":1,"python":15,"backend":10,"kafka":3,"async":2,"redis":4,"gil":2,"interview":3,"go":3,"jwt":1,"docker":1,"serverless":1,"lambda":1,"microservice":1,"rabbitmq":1,"postgres":1,"lock":1,"mongodb":1,"nlp":1,"sematic-search":1,"slack":1,"golang":1,"node":1,"celery":1,"wrapper":1}
