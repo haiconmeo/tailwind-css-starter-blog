@@ -1,0 +1,377 @@
+
+---
+title: 'Tích hợp DynamoDB với Golang'
+date: '2024-07-14'
+tags: ['dynamodb', 'golang', 'backend']
+draft: false
+summary: là một dịch vụ cơ sở dữ liệu NoSQL được quản lý toàn phần do Amazon Web Services (AWS) cung cấp. DynamoDB cho phép người dùng lưu trữ và truy xuất lượng dữ liệu lớn với hiệu suất cao mà không cần phải quản lý hạ tầng cơ sở dữ liệu phức tạp.
+
+---
+## Chương 2: Tích hợp DynamoDB với Golang
+
+### 2.1 Thiết lập môi trường
+
+#### Cài đặt Golang
+
+1. **Tải và cài đặt Go:**
+   - Tải Golang từ trang chủ: [https://golang.org/dl/](https://golang.org/dl/)
+   - Làm theo hướng dẫn cài đặt cho hệ điều hành của bạn.
+
+2. **Kiểm tra cài đặt:**
+   ```sh
+   go version
+   ```
+
+#### Cài đặt AWS CLI và thiết lập thông tin xác thực
+
+1. **Tải và cài đặt AWS CLI:**
+   - Hướng dẫn cài đặt AWS CLI: [https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
+
+2. **Cấu hình AWS CLI:**
+   ```sh
+   aws configure
+   ```
+   Nhập Access Key, Secret Key, Region và Output Format của bạn.
+
+### 2.2 Cài đặt AWS SDK cho Go
+
+1. **Tạo một dự án Go mới:**
+   ```sh
+   mkdir dynamoDBExample
+   cd dynamoDBExample
+   go mod init dynamoDBExample
+   ```
+
+2. **Cài đặt AWS SDK cho Go:**
+   ```sh
+   go get github.com/aws/aws-sdk-go-v2
+   go get github.com/aws/aws-sdk-go-v2/config
+   go get github.com/aws/aws-sdk-go-v2/service/dynamodb
+   ```
+
+### 2.3 Tạo và thao tác với DynamoDB từ Golang
+
+#### Kết nối và tương tác với DynamoDB
+
+1. **Tạo một tập tin `main.go`:**
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+       "log"
+
+       "github.com/aws/aws-sdk-go-v2/aws"
+       "github.com/aws/aws-sdk-go-v2/config"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+   )
+
+   func main() {
+       // Load the Shared AWS Configuration
+       cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
+       if err != nil {
+           log.Fatalf("unable to load SDK config, %v", err)
+       }
+
+       // Create DynamoDB client
+       svc := dynamodb.NewFromConfig(cfg)
+
+       // Print a message to indicate the client was created successfully
+       fmt.Println("Successfully created DynamoDB client")
+   }
+   ```
+
+2. **Chạy chương trình:**
+   ```sh
+   go run main.go
+   ```
+
+#### Tạo bảng trong DynamoDB
+
+1. **Cập nhật `main.go` để tạo bảng:**
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+       "log"
+
+       "github.com/aws/aws-sdk-go-v2/aws"
+       "github.com/aws/aws-sdk-go-v2/config"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+   )
+
+   func main() {
+       cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
+       if err != nil {
+           log.Fatalf("unable to load SDK config, %v", err)
+       }
+
+       svc := dynamodb.NewFromConfig(cfg)
+
+       tableName := "ExampleTable"
+       input := &dynamodb.CreateTableInput{
+           TableName: aws.String(tableName),
+           KeySchema: []types.KeySchemaElement{
+               {
+                   AttributeName: aws.String("ID"),
+                   KeyType:       types.KeyTypeHash,
+               },
+           },
+           AttributeDefinitions: []types.AttributeDefinition{
+               {
+                   AttributeName: aws.String("ID"),
+                   AttributeType: types.ScalarAttributeTypeS,
+               },
+           },
+           ProvisionedThroughput: &types.ProvisionedThroughput{
+               ReadCapacityUnits:  aws.Int64(5),
+               WriteCapacityUnits: aws.Int64(5),
+           },
+       }
+
+       _, err = svc.CreateTable(context.TODO(), input)
+       if err != nil {
+           log.Fatalf("Got error calling CreateTable: %v", err)
+       }
+
+       fmt.Println("Created the table", tableName)
+   }
+   ```
+
+3. **Chạy chương trình để tạo bảng:**
+   ```sh
+   go run main.go
+   ```
+
+#### Thêm mục vào bảng
+
+1. **Cập nhật `main.go` để thêm mục:**
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+       "log"
+
+       "github.com/aws/aws-sdk-go-v2/aws"
+       "github.com/aws/aws-sdk-go-v2/config"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+   )
+
+   func main() {
+       cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
+       if err != nil {
+           log.Fatalf("unable to load SDK config, %v", err)
+       }
+
+       svc := dynamodb.NewFromConfig(cfg)
+
+       tableName := "ExampleTable"
+
+       // PutItem input
+       input := &dynamodb.PutItemInput{
+           TableName: aws.String(tableName),
+           Item: map[string]types.AttributeValue{
+               "ID": &types.AttributeValueMemberS{Value: "123"},
+               "Name": &types.AttributeValueMemberS{Value: "John Doe"},
+               "Age": &types.AttributeValueMemberN{Value: "30"},
+           },
+       }
+
+       _, err = svc.PutItem(context.TODO(), input)
+       if err != nil {
+           log.Fatalf("Got error calling PutItem: %v", err)
+       }
+
+       fmt.Println("Successfully added item to table", tableName)
+   }
+   ```
+
+2. **Chạy chương trình để thêm mục:**
+   ```sh
+   go run main.go
+   ```
+
+#### Đọc dữ liệu từ bảng
+
+1. **Cập nhật `main.go` để đọc mục:**
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+       "log"
+
+       "github.com/aws/aws-sdk-go-v2/aws"
+       "github.com/aws/aws-sdk-go-v2/config"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+   )
+
+   func main() {
+       cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
+       if err != nil {
+           log.Fatalf("unable to load SDK config, %v", err)
+       }
+
+       svc := dynamodb.NewFromConfig(cfg)
+
+       tableName := "ExampleTable"
+       key := map[string]types.AttributeValue{
+           "ID": &types.AttributeValueMemberS{Value: "123"},
+       }
+
+       result, err := svc.GetItem(context.TODO(), &dynamodb.GetItemInput{
+           TableName: aws.String(tableName),
+           Key:       key,
+       })
+       if err != nil {
+           log.Fatalf("Got error calling GetItem: %v", err)
+       }
+
+       if result.Item == nil {
+           fmt.Println("Could not find item with ID 123")
+           return
+       }
+
+       fmt.Println("Found item:", result.Item)
+   }
+   ```
+
+2. **Chạy chương trình để đọc mục:**
+   ```sh
+   go run main.go
+   ```
+
+#### Cập nhật dữ liệu trong bảng
+
+1. **Cập nhật `main.go` để cập nhật mục:**
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+       "log"
+
+       "github.com/aws/aws-sdk-go-v2/aws"
+       "github.com/aws/aws-sdk-go-v2/config"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+   )
+
+   func main() {
+       cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
+       if err != nil {
+           log.Fatalf("unable to load SDK config, %v", err)
+       }
+
+       svc := dynamodb.NewFromConfig(cfg)
+
+       tableName := "ExampleTable"
+       key := map[string]types.AttributeValue{
+           "ID": &types.AttributeValueMemberS{Value: "123"},
+       }
+
+       update := map[string]types.AttributeValueUpdate{
+           "Age": {
+               Value: &types.AttributeValueMemberN{Value: "31"},
+               Action: types.AttributeActionPut,
+           },
+       }
+
+       _, err = svc.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
+           TableName: aws.String(tableName),
+           Key:       key,
+           AttributeUpdates: update,
+       })
+       if err != nil {
+           log.Fatalf("Got error calling UpdateItem: %v", err)
+       }
+
+       fmt.Println("Successfully updated item in table", tableName)
+   }
+   ```
+
+2. **Chạy chương trình để cập nhật mục:**
+   ```sh
+   go run main.go
+   ```
+
+#### Xóa dữ liệu trong bảng
+
+1. **Cập nhật `main.go` để xóa mục:**
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+       "log"
+
+       "github.com/aws/aws-sdk-go-v2/aws"
+       "github.com/aws/aws-sdk-go-v2/config"
+       "github.com/aws/aws-sdk-go-v
+
+2/service/dynamodb"
+       "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+   )
+
+   func main() {
+       cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
+       if err != nil {
+           log.Fatalf("unable to load SDK config, %v", err)
+       }
+
+       svc := dynamodb.NewFromConfig(cfg)
+
+       tableName := "ExampleTable"
+       key := map[string]types.AttributeValue{
+           "ID": &types.AttributeValueMemberS{Value: "123"},
+       }
+
+       _, err = svc.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+           TableName: aws.String(tableName),
+           Key:       key,
+       })
+       if err != nil {
+           log.Fatalf("Got error calling DeleteItem: %v", err)
+       }
+
+       fmt.Println("Successfully deleted item from table", tableName)
+   }
+   ```
+
+2. **Chạy chương trình để xóa mục:**
+   ```sh
+   go run main.go
+   ```
+
+### 2.4 Tổng kết
+
+Trong chương này, chúng ta đã học cách tích hợp DynamoDB với Golang. Chúng ta đã cài đặt môi trường, thiết lập AWS SDK cho Go và thực hiện các thao tác cơ bản như tạo bảng, thêm mục, đọc dữ liệu, cập nhật và xóa dữ liệu từ DynamoDB. Những kỹ năng này sẽ giúp bạn xây dựng các ứng dụng mạnh mẽ sử dụng DynamoDB và Golang.
+
+---
+
+### Bài tập
+
+1. Tạo một bảng mới với khóa chính là Partition Key và Sort Key.
+2. Thêm nhiều mục vào bảng với các giá trị khác nhau.
+3. Thực hiện truy vấn để lấy danh sách các mục dựa trên Sort Key.
+4. Cập nhật một thuộc tính của một mục cụ thể.
+5. Xóa nhiều mục khỏi bảng dựa trên điều kiện cụ thể.
+
+---
+
+### Tài liệu tham khảo
+
+- [DynamoDB Developer Guide](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html)
+- [AWS SDK for Go Developer Guide](https://aws.github.io/aws-sdk-go-v2/docs/)
+
