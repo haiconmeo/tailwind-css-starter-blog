@@ -1,0 +1,124 @@
+---
+title: '006. Trình duyệt vân tay - Biên dịch ngẫu nhiên dấu vân tay âm thanh'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+### I. Dấu vân tay âm thanh là gì?
+
+* **Dấu vân tay âm thanh (Audio fingerprint)** là một công nghệ nhận dạng dựa trên việc trích xuất các đặc điểm nổi bật của âm thanh, biến chúng thành một dấu hiệu đặc trưng có thể dùng để nhận dạng.
+* Những đặc điểm này thường không bị ảnh hưởng bởi sự thay đổi không dễ nhận thấy, như cao độ, nhịp điệu, phổ âm thanh, v.v.
+* Tuy nhiên, dấu vân tay âm thanh không có độ độc đáo quá cao khi sử dụng một mình, thường được kết hợp với các dấu vân tay khác để đạt được độ chính xác cao hơn.
+
+### II. Làm thế nào để lấy dấu vân tay âm thanh?
+
+* Trước tiên, hãy xem các trang web thường thu thập dấu vân tay âm thanh của bạn như thế nào bằng JavaScript. Hãy sao chép đoạn mã sau vào bảng điều khiển F12 để lấy dấu vân tay của bạn:
+
+```javascript
+let AudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+let context = new AudioContext(1, 5000, 44100);
+let oscillator = context.createOscillator();
+oscillator.type = "triangle";
+oscillator.frequency.value = 1000;
+let compressor = context.createDynamicsCompressor();
+compressor.threshold.value = -50;
+compressor.knee.value = 40;
+compressor.ratio.value = 12;
+compressor.reduction.value = 20;
+compressor.attack.value = 0;
+compressor.release.value = 0.2;
+oscillator.connect(compressor);
+compressor.connect(context.destination);
+
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+oscillator.start();
+context.oncomplete = event => {
+    let samples = event.renderedBuffer.getChannelData(0);
+    let samples_str = JSON.stringify(samples);
+    sha256(samples_str).then(hash => console.log(hash));
+};
+context.startRendering();
+```
+
+* Sau khi chạy đoạn mã trên, bạn sẽ nhận được một mã băm (hash) như sau:
+
+```
+e336f0bfce56a91fd1fd0a88530f3bf323ad23cf6155769cc89b09092880cde9
+```
+
+> Lưu ý: Độ duy nhất của dấu vân tay âm thanh không cao, nên thường được kết hợp với các loại dấu vân tay khác để tăng độ chính xác.
+
+### III. Biên dịch ngẫu nhiên dấu vân tay âm thanh
+
+* Nếu bạn đã biên dịch thành công Chromium, hãy mở mã nguồn `third_party/blink/renderer/modules/webaudio/offline_audio_context.cc`.
+
+#### 1. Thêm dòng này sau một `#include` bất kỳ:
+
+```cpp
+#include <random>
+```
+
+#### 2. Tìm đoạn mã sau:
+
+```cpp
+OfflineAudioContext::OfflineAudioContext(LocalDOMWindow* window,
+                                         unsigned number_of_channels,
+                                         uint32_t number_of_frames,
+                                         float sample_rate,
+                                         ExceptionState& exception_state)
+    : BaseAudioContext(window, kOfflineContext),
+      total_render_frames_(number_of_frames) {
+  destination_node_ = OfflineAudioDestinationNode::Create(
+      this, number_of_channels, number_of_frames, sample_rate);
+  Initialize();
+}
+```
+
+#### Thay thế bằng đoạn sau:
+
+```cpp
+int getRandomIntForFoo6Modern() {
+    static std::mt19937 generator(static_cast<unsigned long>(time(NULL)));
+    std::uniform_int_distribution<int> distribution(0, 99);
+    return distribution(generator);
+}
+
+OfflineAudioContext::OfflineAudioContext(LocalDOMWindow* window,
+                                         unsigned number_of_channels,
+                                         uint32_t number_of_frames,
+                                         float sample_rate,
+                                         ExceptionState& exception_state)
+    : BaseAudioContext(window, kOfflineContext),
+      total_render_frames_(number_of_frames) {
+  destination_node_ = OfflineAudioDestinationNode::Create(
+      this, number_of_channels, number_of_frames , sample_rate + getRandomIntForFoo6Modern());
+  Initialize();
+}
+```
+
+#### 3. Tiến hành biên dịch
+
+```bash
+ninja -C out/Default chrome
+```
+
+Sau khi biên dịch, mỗi lần tải lại trang, dấu vân tay âm thanh của bạn sẽ được tạo ngẫu nhiên.
+
+> Lưu ý: Thay đổi này có thể ảnh hưởng đến chất lượng âm thanh của trình duyệt.
+
+### IV. Các trang web kiểm tra dấu vân tay trực tuyến:
+
+* https://abrahamjuliot.github.io/creepjs/
+* https://ip77.net/
+
+### V. Tương lai của trình duyệt vân tay mã nguồn mở
+
+> Hiện tại, các trình duyệt vân tay trên thị trường đều có phí. Tôi muốn phát triển một phiên bản mã nguồn mở, hy vọng sẽ không gặp rắc rối gì!

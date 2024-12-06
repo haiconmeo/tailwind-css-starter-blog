@@ -1,0 +1,62 @@
+---
+title: 'Sửa đổi mã nguồn Chromium để tạo ngẫu nhiên với dấu vân tay fonts'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+
+004. Biên Dịch Trình Duyệt Ngẫu Nhiên Với Dấu Vân Tay Fonts
+=====================
+
+### 1. Dấu Vân Tay Fonts Là Gì?
+* Font fingerprinting, hay kỹ thuật dấu vân tay fonts, là một phương pháp theo dõi hành vi người dùng trực tuyến.
+* Khi bạn truy cập vào một trang web, trang đó có thể sử dụng JavaScript để kiểm tra hệ thống của bạn đã cài đặt những phông chữ nào.
+* Vì mỗi người cài đặt các phông chữ khác nhau do hệ điều hành, sở thích cá nhân hoặc yêu cầu công việc, nên danh sách phông chữ thu thập được có thể tạo ra một "dấu vân tay" khá độc đáo.
+
+### 2. Cách Lấy Dấu Vân Tay Fonts
+* Bạn có thể lấy dấu vân tay fonts bằng cách sử dụng JavaScript đơn giản để kiểm tra các phông chữ trên hệ thống của mình. Dưới đây là một đoạn mã ví dụ:
+
+```javascript
+var baseFonts = ['monospace', 'sans-serif', 'serif'];
+var testString = "mmmmmmmmmmlli";
+var testSize = '72px';
+var h = document.getElementsByTagName('body')[0];
+var s = document.createElement('span');
+s.style.fontSize = testSize;
+s.innerHTML = testString;
+var defaultWidth = {};
+var defaultHeight = {};
+for (var index in baseFonts) {
+    s.style.fontFamily = baseFonts[index];
+    h.appendChild(s);
+    defaultWidth[baseFonts[index]] = s.offsetWidth;
+    defaultHeight[baseFonts[index]] = s.offsetHeight;
+    h.removeChild(s);
+}
+function detectFont(font) {
+    var detected = false;
+    for (var i = 0; i < baseFonts.length; i++) {
+        s.style.fontFamily = font + ',' + baseFonts[i];
+        h.appendChild(s);
+        var matched = (s.offsetWidth != defaultWidth[baseFonts[i]] || s.offsetHeight != defaultHeight[baseFonts[i]]);
+        h.removeChild(s);
+        detected = detected || matched;
+    }
+    return detected;
+}
+var fonts = ["Arial", "Times New Roman", "Courier"];
+var fontList = {};
+for (var i = 0; i < fonts.length; i++) {
+    var result = detectFont(fonts[i]);
+    fontList[fonts[i]] = result;
+}
+console.log(JSON.stringify(fontList));
+```
+
+### 3. Nguyên Lý Dấu Vân Tay Fonts
+* Mỗi lần JavaScript gọi `offsetWidth` và `offsetHeight` để đo kích thước phông chữ, hệ thống sẽ trả về giá trị khác nhau nếu có phông chữ nhất định cài đặt trên máy.
+
+### 4. Biên Dịch Dấu Vân Tay Ngẫu Nhiên Fonts
+* Để đánh lừa trang web trong việc phát hiện dấu vân tay fonts, ta có thể tạo ra kết quả ngẫu nhiên mỗi khi trình duyệt gọi các thuộc tính đo lường phông chữ bằng cách chỉnh sửa mã nguồn Chromium.
+

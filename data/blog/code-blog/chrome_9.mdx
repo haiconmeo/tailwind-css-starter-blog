@@ -1,0 +1,117 @@
+---
+title: 'Sửa đổi mã nguồn Chromium để tạo ngẫu nhiên dấu vân tay WebGL'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+002. Sửa đổi mã nguồn Chromium để tạo ngẫu nhiên dấu vân tay WebGL
+=================================
+
+003. Sửa đổi mã nguồn Chromium để tạo ngẫu nhiên dấu vân tay WebGL
+=========================
+
+### 1. WebGL và dấu vân tay WebGL là gì?
+
+* **WebGL (Web Graphics Library)**: là một API JavaScript dùng để render đồ họa 2D và 3D hiệu năng cao ngay trên trình duyệt mà không cần cài thêm plugin.
+* **Dấu vân tay WebGL**: là mã định danh duy nhất được tạo dựa trên API WebGL trong trình duyệt. Sử dụng sự khác biệt giữa các GPU của các thiết bị khác nhau, dấu vân tay WebGL có thể được dùng để theo dõi người dùng.
+
+### 2. Cách lấy dấu vân tay WebGL của trình duyệt
+
+* Bạn có thể chạy đoạn mã dưới đây trong console (F12) của trình duyệt để xem dấu vân tay WebGL của mình:
+
+```javascript
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+function getWebGLFingerprint() {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    
+    if (!gl) {
+        return null;
+    }
+
+    const getGlParam = function(parameter) {
+        const value = gl.getParameter(parameter);
+        return value ? value.toString() : 'null';
+    };
+
+    const webglParams = [
+        gl.VENDOR, 
+        gl.RENDERER, 
+        gl.VERSION, 
+        gl.getSupportedExtensions(), 
+        gl.MAX_TEXTURE_SIZE, 
+        gl.MAX_RENDERBUFFER_SIZE,
+    ];
+
+    const glValues = webglParams.map(param => {
+        if (Array.isArray(param)) {
+            return param.join('-');
+        }
+        return getGlParam(param);
+    });
+
+    const webglFingerprint = glValues.join('_');
+    return webglFingerprint;
+}
+
+sha256(getWebGLFingerprint()).then(hash => console.log(hash));
+```
+
+Kết quả sẽ là một chuỗi hash, ví dụ: `dfe89f41416faecf0ab4be2ddeccdc79999aafd3577a0e14e9b3e5265e72d6e7`.
+
+### 3. Sửa mã nguồn Chromium để tạo dấu vân tay WebGL ngẫu nhiên
+
+#### Bước 1: Chỉnh sửa hàm `getSupportedExtensions()`
+1. Tìm tệp `webgl_rendering_context_base.cc` trong mã nguồn Chromium:  
+   `third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc`
+
+2. Thêm các thư viện vào phần đầu tệp:
+
+```cpp
+#include <algorithm> // std::shuffle
+#include <random>    // std::default_random_engine
+#include <chrono>    // std::chrono::system_clock
+```
+
+3. Thay thế hàm `getSupportedExtensions()` hiện tại bằng đoạn mã dưới đây:
+
+```cpp
+std::optional<Vector<String>> WebGLRenderingContextBase::getSupportedExtensions() {
+    if (isContextLost())
+        return std::nullopt;
+
+    Vector<String> result;
+
+    for (ExtensionTracker* tracker : extensions_) {
+        if (ExtensionSupportedAndAllowed(tracker)) {
+            result.push_back(tracker->ExtensionName());
+        }
+    }
+
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine engine(seed);
+    
+    std::shuffle(result.begin(), result.end(), engine);
+    
+    return result;
+}
+```
+
+Trong đoạn mã này, chúng ta dùng `std::shuffle` để ngẫu nhiên hóa danh sách các extension WebGL, do đó dấu vân tay WebGL thu thập bởi JavaScript sẽ khác nhau mỗi lần.
+
+### 4. Xác minh dấu vân tay WebGL
+
+Bạn có thể kiểm tra dấu vân tay WebGL của mình trên các trang web sau:
+
+* [https://browserleaks.com/webgl](https://browserleaks.com/webgl)
+* [https://abrahamjuliot.github.io/creepjs/](https://abrahamjuliot.github.io/creepjs/)
+
+Việc ngẫu nhiên hóa dấu vân tay sẽ giúp cải thiện sự riêng tư và giảm thiểu khả năng bị theo dõi thông qua dấu vân tay WebGL.

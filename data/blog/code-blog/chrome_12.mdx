@@ -1,0 +1,215 @@
+---
+title: 'Sửa đổi mã nguồn Chromium -Thay đổi vân tay Canvas (Phần 2)'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+
+### I. Vân tay Canvas là gì
+
+* Trước đây, đã có giới thiệu về vân tay Canvas và cách các trang web thường xuyên vượt qua vân tay Canvas, bạn có thể tham khảo: [link bài viết](https://blog.csdn.net/w1101662433/article/details/137959179)
+
+### II. Tại sao có vân tay Canvas - Phần 2
+
+* Ở phần trước, chúng ta đã giả định rằng các trang web sẽ điền văn bản ngẫu nhiên khi lấy vân tay canvas, do đó chúng ta đã chỉnh sửa hàm `fillText()` để thay đổi vân tay.
+* Tuy nhiên, một số trang web chỉ sử dụng màu sắc để lấy vân tay, và chúng ta cần xử lý điều này trong bài viết này.
+* Hơn nữa, như mọi người đã biết, các trang web như creepjs và browserscan rất nghiêm ngặt trong việc phát hiện vân tay, và nếu chúng ta thay đổi vân tay ngẫu nhiên, rất dễ bị phát hiện là vân tay bị thay đổi.
+
+### III. Lấy vân tay Canvas của trình duyệt (chỉ qua màu sắc)
+
+* Để hiểu cách thức bảo vệ, chúng ta cần xem cách các trang web sử dụng JavaScript để lấy vân tay canvas của bạn.
+* Chỉ cần sao chép mã dưới đây vào bảng điều khiển F12 để lấy và hiển thị vân tay Canvas của bạn.
+
+```javascript
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+function getCanvasFingerprint() {
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = "#f0f"; 
+    ctx.fillRect(10, 10, 50, 50);
+    
+    var gradient = ctx.createLinearGradient(0, 0, 100, 100);
+    gradient.addColorStop(0, 'rgba(255, 0, 0, 0.5)');
+    gradient.addColorStop(1, 'rgba(0, 255, 0, 0.5)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(10, 70, 50, 50);
+    
+    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    return imageData ;
+}
+
+sha256(getCanvasFingerprint()).then(hash => console.log(hash));
+```
+
+### IV. Sửa đổi mã nguồn
+
+* Mở tệp mã nguồn `\third_party\blink\renderer\modules\canvas\canvas2d\base_rendering_context_2d.cc`
+
+1. Thêm vào đầu mã (sau một dòng `#include` bất kỳ):
+
+```cpp
+#include <string>
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+```
+
+2. Tìm đoạn mã dưới đây:
+
+```cpp
+void BaseRenderingContext2D::setFillStyle(v8::Isolate* isolate,
+                                          v8::Local<v8::Value> value,
+                                          ExceptionState& exception_state) {
+    V8CanvasStyle v8_style;
+    if (!ExtractV8CanvasStyle(isolate, value, v8_style, exception_state))
+        return;
+
+    ValidateStateStack();
+    
+    UpdateIdentifiabilityStudyBeforeSettingStrokeOrFill(v8_style, CanvasOps::kSetFillStyle);
+
+    CanvasRenderingContext2DState& state = GetState();
+    switch (v8_style.type) {
+        case V8CanvasStyleType::kCSSColorValue:
+            state.SetFillColor(v8_style.css_color_value);
+            break;
+        case V8CanvasStyleType::kGradient:
+            state.SetFillGradient(v8_style.gradient);
+            break;
+        case V8CanvasStyleType::kPattern:
+            if (!origin_tainted_by_content_ && !v8_style.pattern->OriginClean())
+                SetOriginTaintedByContent();
+            state.SetFillPattern(v8_style.pattern);
+            break;
+        case V8CanvasStyleType::kString: {
+            if (v8_style.string == state.UnparsedFillColor()) {
+                return;
+            }
+            Color parsed_color = Color::kTransparent;
+            if (!ExtractColorFromV8ValueAndUpdateCache(v8_style, parsed_color)) {
+                return;
+            }
+            if (state.FillStyle().IsEquivalentColor(parsed_color)) {
+                state.SetUnparsedFillColor(v8_style.string);
+                return;
+            }
+            state.SetFillColor(parsed_color);
+            break;
+        }
+    }
+
+    state.SetUnparsedFillColor(v8_style.string);
+    state.ClearResolvedFilter();
+}
+```
+
+3. Thay thế đoạn mã trên bằng:
+
+```cpp
+void BaseRenderingContext2D::setFillStyle(v8::Isolate* isolate,
+                                          v8::Local<v8::Value> value,
+                                          ExceptionState& exception_state) {
+    V8CanvasStyle v8_style;
+    if (!ExtractV8CanvasStyle(isolate, value, v8_style, exception_state))
+        return;
+
+    ValidateStateStack();
+    
+    UpdateIdentifiabilityStudyBeforeSettingStrokeOrFill(v8_style, CanvasOps::kSetFillStyle);
+
+    CanvasRenderingContext2DState& state = GetState();
+    
+    srand((int)time(NULL));  // Thêm ngẫu nhiên ở đây
+    state.SetStrokeColor(Color::FromRGBALegacy(rand() % 5, rand() % 6, rand() % 7, rand() % 255));
+    
+    switch (v8_style.type) {
+        case V8CanvasStyleType::kCSSColorValue:
+            state.SetFillColor(v8_style.css_color_value);
+            break;
+        case V8CanvasStyleType::kGradient:
+            state.SetFillGradient(v8_style.gradient);
+            break;
+        case V8CanvasStyleType::kPattern:
+            if (!origin_tainted_by_content_ && !v8_style.pattern->OriginClean())
+                SetOriginTaintedByContent();
+            state.SetFillPattern(v8_style.pattern);
+            break;
+        case V8CanvasStyleType::kString: {
+            if (v8_style.string == state.UnparsedFillColor()) {
+                return;
+            }
+            Color parsed_color = Color::kTransparent;
+            if (!ExtractColorFromV8ValueAndUpdateCache(v8_style, parsed_color)) {
+                return;
+            }
+
+            parsed_color = Color::FromRGBALegacy(parsed_color.Param1() + rand() % 5, parsed_color.Param1() + rand() % 6, parsed_color.Param2() + rand() % 7, parsed_color.Alpha() * 255);
+
+            state.SetFillColor(parsed_color);
+            break;
+        }
+    }
+
+    state.SetUnparsedFillColor(v8_style.string);
+    state.ClearResolvedFilter();
+}
+```
+
+4. Biên dịch lại mã nguồn:
+
+```bash
+ninja  -C  out/Default chrome
+```
+
+### V. Vượt qua kiểm tra phản đối vân tay trên creepjs
+
+* Sau khi biên dịch, creepjs phát hiện vân tay của chúng ta đã bị sửa đổi.
+* Cách kiểm tra của creepjs là tạo hai hình ảnh giống nhau và so sánh chúng từng khung hình. Nếu có sự khác biệt, nó sẽ cho rằng vân tay đã bị thay đổi.
+
+Để vượt qua kiểm tra này, ta cần sửa mã nguồn thêm một chút.
+
+1. Tìm đoạn mã sau:
+
+```cpp
+ImageData* BaseRenderingContext2D::getImageDataInternal(
+    int sx,
+    int sy,
+    int sw,
+    int sh,
+    ImageDataSettings* image_data_settings,
+    ExceptionState& exception_state) {
+```
+
+2. Thay đổi thành:
+
+```cpp
+ImageData* BaseRenderingContext2D::getImageDataInternal(
+    int sx,
+    int sy,
+    int sw,
+    int sh,
+    ImageDataSettings* image_data_settings,
+    ExceptionState& exception_state) {
+
+    if (sh == 1) { return nullptr; }  // Thêm dòng này để qua được creepjs
+}
+```
+
+3. Biên dịch lại:
+
+```bash
+ninja  -C  out/Default chrome
+```
+
+### VI. Các trang web kiểm tra vân tay trực tuyến:
+
+* [CreepJS](https://abrahamjuliot.github.io/creepjs/)
+* [Browserscan](https://www.browserscan.net/)

@@ -1,0 +1,106 @@
+---
+title: 'Sửa đổi mã nguồn Chromium để tạo Vân tay TLS ngẫu nhiên (vân tay JA3)'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+### 008. Biên dịch trình duyệt vân tay của bạn - Vân tay TLS ngẫu nhiên (vân tay JA3)
+
+### I. Vân tay TLS và vân tay JA3 là gì?
+
+#### Vân tay TLS:
+
+* Vân tay TLS thường được tạo ra từ thông điệp **TLS Client Hello** mà khách hàng gửi đến máy chủ trong quá trình bắt tay TLS.
+* Thông điệp này bao gồm nhiều trường thông tin, chẳng hạn như danh sách bộ mã hóa hỗ trợ, phương thức nén, phiên bản TLS, và các mở rộng. Mỗi trình duyệt hoặc phần mềm khách khi thiết lập kết nối TLS với máy chủ có thể sẽ tạo ra một thông điệp **Client Hello** khác nhau vì chúng thực hiện chuẩn TLS theo cách khác nhau.
+* Thông qua việc thu thập và phân tích những thông tin này, một "dấu vân tay" có thể được tạo ra.
+
+#### Vân tay JA3:
+
+* JA3 là một phương pháp vân tay TLS đặc biệt được phát triển bởi nhóm Salesforce.
+* Nó tạo ra một phương pháp có cấu trúc để biểu diễn các phần không thay đổi trong quá trình bắt tay TLS, bao gồm phiên bản TLS, thuật toán mã hóa có thể chấp nhận, các mở rộng, v.v., và kết hợp các yếu tố này thành một giá trị băm MD5.
+* Các phiên bản trình duyệt khác nhau sẽ có vân tay JA3 khác nhau.
+
+### II. Làm thế nào để lấy vân tay TLS của bạn trực tuyến?
+
+* Trang web 1: [https://tls.peet.ws/](https://tls.peet.ws/)
+* Trang web 2: [https://browserleaks.com/tls](https://browserleaks.com/tls)
+
+### III. Biên dịch Chromium - Vân tay TLS ngẫu nhiên
+
+* Giả sử bạn đã biên dịch thành công Chromium, và tôi đã hướng dẫn quy trình biên dịch trong bài viết trước.
+* Mở mã nguồn tại `third_party/boringssl/src/ssl/ssl_cipher.cc`.
+
+#### 1. Thêm các dòng sau (có thể thêm sau bất kỳ dòng `#include` nào):
+
+```cpp
+#include <algorithm>
+#include <random>
+#include <iostream>
+```
+
+#### 2. Tìm đoạn mã sau:
+
+```cpp
+static const uint16_t kLegacyCiphers[] = {
+    TLS1_CK_ECDHE_ECDSA_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_RSA_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_PSK_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_ECDSA_WITH_AES_256_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_RSA_WITH_AES_256_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_PSK_WITH_AES_256_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_RSA_WITH_AES_128_CBC_SHA256 & 0xffff,
+    TLS1_CK_RSA_WITH_AES_128_GCM_SHA256 & 0xffff,
+    TLS1_CK_RSA_WITH_AES_256_GCM_SHA384 & 0xffff,
+    TLS1_CK_RSA_WITH_AES_128_SHA & 0xffff,
+    TLS1_CK_PSK_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_RSA_WITH_AES_256_SHA & 0xffff,
+    TLS1_CK_PSK_WITH_AES_256_CBC_SHA & 0xffff,
+    SSL3_CK_RSA_DES_192_CBC3_SHA & 0xffff,
+};
+```
+
+> Bạn có thể thấy rằng **các phương thức mã hóa** trong Chromium đã được định sẵn, và thứ tự cũng vậy. Chúng ta không thể tùy ý thêm hoặc bớt phương thức mã hóa, nhưng có thể trộn ngẫu nhiên thứ tự của chúng.
+
+#### Thay thế bằng:
+
+```cpp
+static uint16_t kLegacyCiphers[] = {
+    TLS1_CK_ECDHE_ECDSA_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_RSA_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_PSK_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_ECDSA_WITH_AES_256_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_RSA_WITH_AES_256_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_PSK_WITH_AES_256_CBC_SHA & 0xffff,
+    TLS1_CK_ECDHE_RSA_WITH_AES_128_CBC_SHA256 & 0xffff,
+    TLS1_CK_RSA_WITH_AES_128_GCM_SHA256 & 0xffff,
+    TLS1_CK_RSA_WITH_AES_256_GCM_SHA384 & 0xffff,
+    TLS1_CK_RSA_WITH_AES_128_SHA & 0xffff,
+    TLS1_CK_PSK_WITH_AES_128_CBC_SHA & 0xffff,
+    TLS1_CK_RSA_WITH_AES_256_SHA & 0xffff,
+    TLS1_CK_PSK_WITH_AES_256_CBC_SHA & 0xffff,
+    SSL3_CK_RSA_DES_192_CBC3_SHA & 0xffff,
+};
+
+size_t arraySize = sizeof(kLegacyCiphers) / sizeof(kLegacyCiphers[0]);
+std::random_device rd;
+std::mt19937 rng(rd());
+std::shuffle(kLegacyCiphers, kLegacyCiphers + arraySize, rng);
+for (const auto& value : kLegacyCiphers) {
+    std::cout << std::hex << value << std::endl;
+}
+```
+
+> Như vậy, thứ tự mã hóa sẽ bị xáo trộn ngẫu nhiên.
+
+#### 3. Biên dịch:
+
+```bash
+ninja -C out/Default chrome
+```
+
+* Sau khi biên dịch, mỗi lần tải lại trang, vân tay TLS sẽ ngẫu nhiên thay đổi.
+
+### IV. Đang mệt mỏi
+
+> Có công việc nào **lương cao** mà không mệt không nhỉ... Mệt quá, đường dài thì khó đi, mà dòng nước cũng dài.

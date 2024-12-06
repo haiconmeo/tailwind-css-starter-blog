@@ -1,0 +1,125 @@
+---
+title: 'Sửa đổi mã nguồn Chromium để tạo ngẫu nhiên dấu vân tay plugin'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+### 007. Trình duyệt vân tay - Biên dịch ngẫu nhiên dấu vân tay plugin
+
+### I. Dấu vân tay plugin là gì?
+
+* **Dấu vân tay plugin (browser plugin fingerprinting)** là một công nghệ theo dõi trực tuyến.
+* Nó dựa trên các thông tin của các plugin đã được cài đặt, từ đó tổng hợp và tạo ra một dấu vân tay độc nhất.
+* Dấu vân tay plugin không có độ duy nhất cao, nên cần kết hợp với các dấu vân tay khác để đạt được độ chính xác cao hơn.
+
+### II. Làm thế nào để lấy dấu vân tay plugin của bạn?
+
+* Trước tiên, chúng ta cần tìm hiểu cách các trang web lấy dấu vân tay plugin của bạn qua JavaScript. Hãy sao chép đoạn mã dưới đây vào bảng điều khiển F12 để lấy dấu vân tay plugin của bạn.
+
+```javascript
+async function sha256(message) {
+    // Chuyển chuỗi thành Uint8Array
+    const msgBuffer = new TextEncoder().encode(message);
+    // Tính toán giá trị hash
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    // Chuyển đổi thành mảng
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    // Chuyển thành chuỗi hex
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+function getPluginsString() {
+    if (navigator.plugins === undefined || navigator.plugins.length === 0) {
+        return 'no plugins'; // Chỉ ra không có plugin hoặc không thể truy cập thông tin plugin
+    }
+    var pluginsString = [];
+
+    // Duyệt qua danh sách plugin
+    for (var i = 0; i < navigator.plugins.length; i++) {
+        var plugin = navigator.plugins[i];
+        var pluginString = plugin.name + '::' + plugin.description + '::' + plugin.filename;
+        var mimeTypes = [];
+
+        // Duyệt và liệt kê các loại MIME mà plugin hỗ trợ
+        for (var j = 0; j < plugin.length; j++) {
+            var mimeType = plugin[j];
+            mimeTypes.push(mimeType.type + '~' + mimeType.suffixes);
+        }
+
+        // Nếu có loại MIME, thêm vào chuỗi thông tin plugin
+        if (mimeTypes.length > 0) {
+            pluginString += '::' + mimeTypes.join(',');
+        }
+
+        // Thêm chuỗi thông tin plugin đầy đủ vào danh sách
+        pluginsString.push(pluginString);
+    }
+
+    // Trả về một chuỗi thông tin plugin tổng hợp, các plugin được phân cách bằng dấu chấm phẩy
+    return pluginsString.join(';');
+}
+
+var pluginsFingerprint = getPluginsString();
+// Chuỗi này có thể dùng làm một phần của dấu vân tay plugin
+
+sha256(pluginsFingerprint).then(hash => console.log(hash));
+```
+
+* Sau khi chạy đoạn mã trên, bạn sẽ nhận được một mã băm (hash) như sau:
+
+```
+e336f0bfce56a91fd1fd0a88530f3bf323ad23cf6155769cc89b09092880cde9
+```
+
+### III. Biên dịch Chromium - Dấu vân tay plugin ngẫu nhiên
+
+* Giả sử bạn đã biên dịch thành công Chromium, và tôi đã hướng dẫn cách biên dịch trong bài viết trước.
+* Mở mã nguồn tại `third_party/blink/renderer/modules/plugins/dom_plugin.cc`.
+
+#### 1. Thêm dòng này sau một `#include` bất kỳ:
+
+```cpp
+#include <random>
+#include <string>
+```
+
+#### 2. Tìm đoạn mã sau:
+
+```cpp
+String DOMPlugin::description() const {
+  return plugin_info_->Description();
+}
+```
+
+#### Thay thế bằng đoạn mã sau:
+
+```cpp
+int getRandomIntForFoo8Modern() {
+    static std::mt19937 generator(static_cast<unsigned long>(time(NULL))); // Sử dụng static để chỉ khởi tạo một lần
+    std::uniform_int_distribution<int> distribution(0, 9);
+    return distribution(generator);
+}
+
+String DOMPlugin::description() const {
+  //return plugin_info_->Description();
+  String tmp = plugin_info_->Description();
+  return tmp + String(std::to_string(getRandomIntForFoo8Modern()));
+}
+```
+
+> Nguyên lý ở đây là thêm một [số ngẫu nhiên](https://so.csdn.net/so/search?q=%E9%9A%8F%E6%9C%BA%E6%95%B0&spm=1001.2101.3001.7020) vào cuối mô tả của mỗi plugin, tạo ra dấu vân tay ngẫu nhiên khi tính hash.
+
+#### 3. Tiến hành biên dịch:
+
+```bash
+ninja -C out/Default chrome
+```
+
+Sau khi biên dịch, mỗi lần tải lại trang, dấu vân tay plugin sẽ ngẫu nhiên thay đổi.
+
+### IV. Các trang web kiểm tra dấu vân tay trực tuyến:
+
+* https://abrahamjuliot.github.io/creepjs/
+* https://ip77.net/

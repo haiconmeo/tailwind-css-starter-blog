@@ -1,0 +1,130 @@
+---
+title: 'Sửa đổi mã nguồn Chromium- Làm thế nào để cố định dấu vân tay thông qua tham số truyền vào'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+**013. Tùy chỉnh dấu vân tay Chromium - Làm thế nào để cố định dấu vân tay thông qua tham số truyền vào**
+==============================
+
+**Bản quyền**
+
+[![](https://i-blog.csdnimg.cn/direct/2772effc4cf2434486cbd20912e7d6db.png?x-oss-process=image/resize,m_fixed,h_224,w_224) Biên soạn trình duyệt dấu vân tay của riêng bạn](https://blog.csdn.net/w1101662433/category_12647225.html "Biên soạn trình duyệt dấu vân tay của riêng bạn")
+
+29 bài viết 129 người đăng ký
+
+**Đăng ký chuyên mục**
+
+---
+
+**Tùy chỉnh dấu vân tay Chromium - Làm thế nào để cố định dấu vân tay thông qua tham số truyền vào**
+--------------------------
+
+> Vì việc phải cố định tất cả các loại dấu vân tay sẽ rất tốn công, tôi chỉ sử dụng dấu vân tay `plugins` làm ví dụ.
+
+#### I. Tại sao phải cố định dấu vân tay?
+
+* Mục tiêu: Khi khởi động trình duyệt, thêm tham số `--fingerprints="xxxxxxx"`, khi tham số thay đổi, dấu vân tay cũng sẽ thay đổi. Sau khi mở trang web, dấu vân tay sẽ không thay đổi nữa.
+* Được sử dụng rộng rãi trên các nền tảng thương mại điện tử.
+
+#### II. Dấu vân tay plugins là gì?
+
+* Trước đây tôi đã giới thiệu về dấu vân tay `plugins` và cách sửa đổi nó: [Tham khảo](https://blog.csdn.net/w1101662433/article/details/138058525)
+
+#### III. Sửa đổi lại mã nguồn
+
+* Mở mã nguồn `third_party/blink/renderer/modules/plugins/dom_plugin.cc`
+
+##### 1. Thêm vào đầu file (Thêm vào sau một `#include` bất kỳ, nếu đã thêm trước đó thì không cần thêm nữa)
+
+```cpp
+#include <random>
+#include <string>
+#include "base/command_line.h"
+```
+
+##### 2. Tìm đoạn mã sau
+
+```cpp
+String DOMPlugin::description() const {
+  return plugin_info_->Description();
+}
+```
+
+##### 3. Thay thế bằng
+
+```cpp
+String DOMPlugin::description() const {
+  //return plugin_info_->Description();
+  base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+  std::string tmp;
+  if (base_command_line->HasSwitch("fingerprints")) {
+      tmp = base_command_line->GetSwitchValueASCII("fingerprints"); 
+  } else {
+      tmp = base_command_line->GetSwitchValueASCII("type"); 
+  }
+  // LOG(ERROR) << "tmp:('" << tmp << "') tmp";
+  String res = plugin_info_->Description();
+  return res + String(tmp);
+}
+```
+
+> Nguyên lý của đoạn mã này là thêm chuỗi lấy từ `--fingerprints` vào cuối mô tả của mỗi plugin.
+
+##### 4. Biên dịch
+
+```bash
+ninja -C out/Default chrome
+```
+
+#### IV. Thêm tham số vào tiến trình render
+
+* Lưu ý: Đây là một giải pháp độc đáo trên toàn mạng.
+
+> Mở trình quản lý tác vụ và bạn sẽ thấy, mặc định Chromium sử dụng đa tiến trình, chỉ có một tiến trình chính, những tiến trình có tham số `--type` là các tiến trình con.
+
+![Mô tả hình ảnh](https://i-blog.csdnimg.cn/blog_migrate/3bced07583c7935dc8ef88a13a4ab235.png)
+
+> Các tham số khởi động trình duyệt mặc định chỉ có thể truyền cho tiến trình chính, vì vậy chúng ta cần cải tiến mã nguồn để truyền tham số cho tiến trình con.
+
+* Mở mã nguồn: `\content\browser\renderer_host\render_process_host_impl.cc`
+
+##### 1. Tìm đoạn mã sau
+
+```cpp
+command_line->AppendSwitchASCII(switches::kProcessType,
+                                  switches::kRendererProcess);
+```
+
+##### 2. Thay thế bằng
+
+```cpp
+command_line->AppendSwitchASCII(switches::kProcessType,
+                                  switches::kRendererProcess);
+
+// Thêm vào
+const base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+if (base_command_line->HasSwitch("fingerprints")) {
+  const std::string tmp = base_command_line->GetSwitchValueASCII("fingerprints");
+  command_line->AppendSwitchASCII("fingerprints", tmp);
+}
+```
+
+##### 3. Biên dịch
+
+```bash
+ninja -C out/Default chrome
+```
+
+> Bây giờ, mỗi khi khởi động Chromium và thay đổi tham số `--fingerprints="xxxxxxx"`, dấu vân tay plugins sẽ thay đổi.
+
+#### V. Xác nhận lại
+
+* Sao chép `navigator.plugins` vào bảng điều khiển F12
+
+![Mô tả hình ảnh](https://i-blog.csdnimg.cn/blog_migrate/40fd061199c45afdce3c6d9d838878d6.png)
+
+* Bạn sẽ thấy rằng mô tả của plugin đã thành công trong việc thêm tham số của chúng ta. Dấu vân tay plugins đã được cố định.
+
+> Tin tôi đi, tôi đã khởi đầu, còn các dấu vân tay khác để cố định, bạn chắc hẳn sẽ rất muốn thử!

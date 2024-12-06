@@ -1,0 +1,93 @@
+---
+title: 'Sửa đổi mã nguồn Chromium để sửa  phiên bản lớn'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+
+* Blog trước đã hướng dẫn cách thay đổi phiên bản nhỏ của Chromium: [Liên kết tới bài viết](https://blog.csdn.net/w1101662433/article/details/140542646)
+* Tuy nhiên, đã có nhiều bạn thử mô phỏng trình duyệt trên điện thoại và WeChat, và cần mô phỏng một phiên bản Chromium cũ hơn.
+* Tôi đã từng thử thay đổi phiên bản lớn, nhưng gặp một số vấn đề, vì vậy đã trì hoãn. Hôm nay tôi sẽ ghi lại quá trình nghiên cứu này.
+
+### I. Vị trí mã nguồn
+
+1. Chắc chắn bạn đã tìm được các tệp chứa thông tin phiên bản nhân Chromium:
+   * `\components\version_info\version_info_with_user_agent.cc`
+   * `\third_party\blink\renderer\core\frame\navigator_ua.cc`
+
+2. Thay đổi phiên bản nhân:
+```cpp
+return base::StrCat(
+      //{"Chrome/", GetMajorVersionNumber(), ".0.", build_version, ".0"});
+      {"Chrome/", "106.0.5249.62"});
+```
+```cpp
+// ua_data->SetBrandVersionList(metadata.brand_version_list);
+UserAgentBrandList uabl;
+uabl.emplace_back("chromium", "106");
+uabl.emplace_back("Chrome", "106");
+ua_data->SetBrandVersionList(uabl);
+
+// ua_data->SetUAFullVersion("106." + String(std::to_string(randomNum % 99)) +".6572.0");
+ua_data->SetUAFullVersion("106." + String("0") +".5249.62");
+```
+> Sau khi biên dịch, bạn có thể thấy rằng phiên bản lớn của trình duyệt đã thay đổi thành công.
+
+3. Kiểm tra chống nhận diện dấu vân tay:
+* Kiểm tra bằng browserscan:
+
+![Kiểm tra bằng browserscan](https://i-blog.csdnimg.cn/direct/b1ad741c0ae4496dbac5412bd4211119.png)
+
+* Kiểm tra bằng creepjs:
+
+![Kiểm tra bằng creepjs](https://i-blog.csdnimg.cn/direct/4c7ba3aa7781494aa03466500ed627d7.png)
+![Kiểm tra bằng creepjs](https://i-blog.csdnimg.cn/direct/97db9eff83924d1b82073623822fd745.png)
+
+> Lưu ý: Việc thay đổi phiên bản nhân thành công, nhưng phát hiện rằng creepjs và browserscan không thể vượt qua việc kiểm tra chống nhận diện dấu vân tay.
+
+### II. Sự khác biệt giữa các phiên bản cũ và mới
+
+* Creepjs đã chỉ rõ lý do không qua được kiểm tra, tính năng của phiên bản v106 khác biệt với tính năng của phiên bản trình duyệt hiện tại.
+* Ví dụ về hàm `JSON.rawJSON`, phiên bản nhân v106 không có hàm này vì đây là tính năng mới trong phiên bản 115. Khi phát hiện hàm này trong trình duyệt phiên bản 106, rất rõ ràng đây là dấu hiệu thay đổi.
+
+![Kiểm tra sự khác biệt giữa các phiên bản](https://i-blog.csdnimg.cn/direct/8781213664f8422581b522377127404a.png)
+
+### III. Xem mã nguồn của creepjs
+
+* Mã nguồn của creepjs có thể được tìm thấy tại: [https://github.com/abrahamjuliot/creepjs](https://github.com/abrahamjuliot/creepjs)
+* Tìm kiếm trong mã nguồn của creepjs trong tệp `\creepjs\src\features\index.ts`
+
+1. Các tính năng JS mới trong từng phiên bản nhân:
+```js
+const blinkJS = {
+    '76': ['Document.onsecuritypolicyviolation', 'Promise.allSettled'],
+    '77': ['Document.onformdata', 'Document.onpointerrawupdate'],
+    // Các tính năng khác...
+};
+```
+
+2. Các tính năng CSS mới trong từng phiên bản nhân:
+```js
+const blinkCSS = {
+    '76': ['backdrop-filter'],
+    '77-80': ['overscroll-behavior-block', 'overscroll-behavior-inline'],
+    // Các tính năng khác...
+};
+```
+
+3. Các tính năng cửa sổ mới trong từng phiên bản nhân:
+```js
+const blinkWindow = {
+    '80': ['CompressionStream', 'DecompressionStream', 'FeaturePolicy', 'FragmentDirective'],
+    // Các tính năng khác...
+};
+```
+
+> Lưu ý: Các tính năng mới ở trên chỉ là một số ví dụ, không phải là tất cả.
+
+### IV. Tổng kết
+
+1. Để thay đổi phiên bản lớn từ cao xuống thấp, bạn cần loại bỏ các tính năng của phiên bản cao hơn. Ngược lại, có thể nghiên cứu thêm nếu cần.
+2. Phiên bản lớn có thể điều chỉnh nhỏ, ví dụ giữa các phiên bản 123-125 hầu như không có sự thay đổi, tôi chọn chuyển qua lại giữa chúng.
+3. Để thay đổi giữa nhiều phiên bản, giải pháp cuối cùng mà tôi đề xuất là tải mã nguồn của phiên bản Chromium cũ, rồi biên dịch lại.

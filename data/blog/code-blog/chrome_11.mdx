@@ -1,0 +1,69 @@
+---
+title: 'Sửa đổi mã nguồn Chromium để Vô hiệu hóa WebRTC'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+
+#### Giới thiệu
+
+* WebRTC (Web Real-Time Communication) là một công nghệ cho phép truyền thông thời gian thực trong các ứng dụng web mà không cần cài đặt plugin. Tuy nhiên, nó có thể tiết lộ địa chỉ IP thực của người dùng, tạo thành một dấu vân tay có thể bị các trang web phát hiện.
+* Ở đây, chúng ta sẽ vô hiệu hóa WebRTC trong Chromium để ngăn việc lộ địa chỉ IP thực.
+
+### I. WebRTC Fingerprint là gì?
+
+* Trước đây đã giới thiệu về WebRTC và cách sửa đổi nhận diện IP của WebRTC: [Bài viết về WebRTC](https://blog.csdn.net/w1101662433/article/details/138001797)
+
+### II. Biên dịch mã nguồn để vô hiệu hóa WebRTC
+
+* Bài viết trước đã chỉ dẫn cách biên dịch Chromium, giả sử bạn đã biên dịch thành công.
+* Tìm trong mã nguồn tại đường dẫn `\third_party\blink\renderer\modules\peerconnection\rtc_peer_connection.cc`.
+
+#### 1. Tìm đoạn mã sau
+
+```cpp
+ScriptPromise<IDLUndefined> RTCPeerConnection::setLocalDescription(
+    ScriptState* script_state,
+    const RTCSessionDescriptionInit* session_description_init,
+    ExceptionState& exception_state) {
+  if (closed_) {
+    exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
+                                      kSignalingStateClosedMessage);
+    return EmptyPromise();
+  }
+}
+```
+
+#### 2. Thay thế bằng mã sau
+
+```cpp
+ScriptPromise<IDLUndefined> RTCPeerConnection::setLocalDescription(
+    ScriptState* script_state,
+    const RTCSessionDescriptionInit* session_description_init,
+    ExceptionState& exception_state) {
+  if (!closed_) {
+    exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
+                                      kSignalingStateClosedMessage);
+    return EmptyPromise();
+  }
+  
+//if (closed_) {
+//  exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
+//                                    kSignalingStateClosedMessage);
+//  return ScriptPromise();
+//}
+```
+
+#### 3. Biên dịch lại
+
+```bash
+ninja -C out/Default chrome
+```
+
+* Sau khi biên dịch, không còn trang web nào có thể dò tìm địa chỉ IP thực của tôi nữa, thật thoải mái.
+
+### III. Các trang web kiểm tra vân tay trực tuyến:
+
+* [https://browserleaks.com/webrtc](https://browserleaks.com/webrtc)
+* [https://www.browserscan.net/](https://www.browserscan.net/)

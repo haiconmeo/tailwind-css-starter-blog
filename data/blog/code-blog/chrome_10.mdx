@@ -1,0 +1,131 @@
+---
+title: 'Sửa đổi mã nguồn Chromium Vượt qua kiểm tra trình duyệt không có giao diện phổ biến'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+
+### Giới thiệu
+
+* Trình duyệt không có giao diện (headless browser) là trình duyệt không có giao diện người dùng, nhưng khi sử dụng làm công cụ thu thập dữ liệu (crawler), nó có thể xuất hiện một số đặc điểm nhận dạng và bị các trang web nhận diện là bot.
+* Ở đây, chúng ta sẽ thay đổi mã nguồn của Chromium để xóa bỏ những đặc điểm nhận dạng này.
+
+### I. Sửa đổi `webdriver`
+
+* Mở file `third_party/blink/renderer/core/frame/navigator.cc`
+
+```cpp
+//bool Navigator::webdriver() const {
+//  if (RuntimeEnabledFeatures::AutomationControlledEnabled())
+//    return true;
+//
+//  bool automation_enabled = false;
+//  probe::ApplyAutomationOverride(GetExecutionContext(), automation_enabled);
+//  return automation_enabled;
+//}
+
+bool Navigator::webdriver() const {
+  return false;
+}
+```
+
+### II. Sửa đổi `rtt`
+
+* Mở file `third_party/blink/renderer/modules/netinfo/network_information.cc`
+
+```cpp
+//uint32_t NetworkInformation::rtt() {
+//  MaybeShowWebHoldbackConsoleMsg();
+//  std::optional<base::TimeDelta> override_rtt =
+//      GetNetworkStateNotifier().GetWebHoldbackHttpRtt();
+//  if (override_rtt) {
+//    return GetNetworkStateNotifier().RoundRtt(Host(), override_rtt.value());
+//  }
+//
+//  if (!IsObserving()) {
+//    return GetNetworkStateNotifier().RoundRtt(
+//        Host(), GetNetworkStateNotifier().HttpRtt());
+//  }
+//
+//  return http_rtt_msec_;
+//}
+
+uint32_t NetworkInformation::rtt() {
+  return 150;
+}
+```
+
+### III. Sửa đổi `Notification.permission`
+
+* Mở file `third_party/blink/renderer/modules/notifications/notification.cc`
+
+```cpp
+String Notification::PermissionString(
+    mojom::blink::PermissionStatus permission) {
+  switch (permission) {
+    case mojom::blink::PermissionStatus::GRANTED:
+      return "granted";
+    case mojom::blink::PermissionStatus::DENIED:
+      //return "denied";
+      return "default";
+    case mojom::blink::PermissionStatus::ASK:
+      return "default";
+  }
+
+  NOTREACHED();
+  //return "denied";
+  return "default";
+}
+```
+
+### IV. Sửa đổi `user-agent`
+
+Đối với trình duyệt không có giao diện (Headless Chrome):
+
+* Mở file `C:\\src\\chromium\\src\\headless\\lib\\browser\\headless_browser_impl.cc`
+  Sửa đổi:
+
+```cpp
+//const char kHeadlessProductName[] = "HeadlessChrome";
+const char kHeadlessProductName[] = "Chrome";
+```
+
+### V. Kiểm tra plugin đối với trình duyệt không có giao diện
+
+* Sửa đổi file `third_party/blink/renderer/modules/plugins/navigator_plugins.cc`
+
+```cpp
+// static
+//DOMPluginArray* NavigatorPlugins::plugins(Navigator& navigator) {
+//  return NavigatorPlugins::From(navigator).plugins(navigator.DomWindow());
+//}
+
+// static
+DOMPluginArray* NavigatorPlugins::plugins(Navigator& navigator) {
+  DOMPluginArray* pluginsArray = NavigatorPlugins::From(navigator).plugins(navigator.DomWindow());
+  pluginsArray->UpdatePluginData();
+  return pluginsArray;
+}
+```
+
+* Sửa đổi tiếp file `third_party/blink/renderer/modules/plugins/dom_plugin_array.cc`
+
+```cpp
+void DOMPluginArray::UpdatePluginData() {
+  if (should_return_fixed_plugin_data_) {
+    dom_plugins_.clear();
+    //if (IsPdfViewerAvailable()) {
+      // See crbug.com/1164635 and https://github.com/whatwg/html/pull/6738.
+      // To reduce fingerprinting and make plugins/mimetypes more
+      // interoperable, this is the spec'd, hard-coded list of plugins:
+      Vector<String> plugins{"PDF Viewer", "Chrome PDF Viewer",
+                             "Chromium PDF Viewer", "Microsoft Edge PDF Viewer",
+                             "WebKit built-in PDF"};
+      for (auto name : plugins)
+        dom_plugins_.push_back(MakeFakePlugin(name, DomWindow()));
+    //}
+    return;
+  }
+}
+```

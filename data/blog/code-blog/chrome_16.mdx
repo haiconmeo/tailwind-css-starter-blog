@@ -1,0 +1,74 @@
+---
+title: 'Sửa đổi mã nguồn Chromium - Dấu vân tay TLS ngẫu nhiên (Dấu vân tay JA4)'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+Dưới đây là bản dịch sang tiếng Việt của nội dung bài viết:
+
+---
+
+**Tùy chỉnh dấu vân tay Chromium - Dấu vân tay TLS ngẫu nhiên (Dấu vân tay JA4)**  
+----------------------------
+
+### I. Dấu vân tay JA4 là gì?
+
+* Dấu vân tay **JA4** có thể hiểu là dấu vân tay **JA3** với thứ tự các thuật toán mã hóa được sắp xếp lại.
+* Trước đây, tôi đã viết một bài blog giới thiệu về dấu vân tay JA3: [Tham khảo bài viết](https://blog.csdn.net/w1101662433/article/details/138301698).
+* Do trước đây chúng ta chỉ thay đổi thứ tự các thuật toán mã hóa, điều này chỉ ảnh hưởng đến dấu vân tay **JA3** và dấu vân tay **Akamai**, còn dấu vân tay **JA4** thì không thay đổi. Vì vậy, lần này chúng ta sẽ thực hiện việc thay đổi ngẫu nhiên các thuật toán mã hóa.
+
+### II. Làm thế nào để lấy dấu vân tay JA4 của bạn trực tuyến?
+
+* Trang web 1: [https://tls.peet.ws/](https://tls.peet.ws/)
+
+### III. Biên dịch Chromium - Dấu vân tay TLS ngẫu nhiên
+
+* Trước tiên, giả sử bạn đã biên dịch thành công Chromium, tôi cũng đã viết một bài hướng dẫn tổng quan về quy trình biên dịch Chromium trong bài viết đầu tiên.
+* Mở tệp mã nguồn `\net\socket\ssl_client_socket_impl.cc`.
+
+###### 1. Thêm dòng mã sau (bạn có thể thêm sau bất kỳ `#include` nào)
+
+```cpp
+#include <random>
+```
+
+###### 2. Định nghĩa một [hàm](https://marketing.csdn.net/p/3127db09a98e0723b83b2914d9256174?pId=2782&utm_source=glcblog&spm=1001.2101.3001.7020) để lấy số ngẫu nhiên:
+
+```cpp
+int getRandomIntForFoo12Modern() {
+    static std::mt19937 generator(static_cast<unsigned long>(time(NULL))); 
+    std::uniform_int_distribution<int> distribution(0, 1);
+    return distribution(generator);
+}
+```
+
+###### 3. Tìm đoạn mã sau:
+
+```cpp
+std::string command("ALL:!aPSK:!ECDSA+SHA1:!3DES");
+```
+
+> Bạn có thể thấy rằng các thuật toán mã hóa trong Chromium đã được cài đặt sẵn, và thứ tự của chúng cũng vậy. Chúng ta không thể xóa hoặc giảm bớt các thuật toán mã hóa, nhưng chúng ta có thể xáo trộn chúng ngẫu nhiên.
+
+###### Thay thế bằng:
+
+```cpp
+//std::string command("ALL:!aPSK:!ECDSA+SHA1:!3DES");
+std::string command("ALL");
+if (getRandomIntForFoo12Modern() == 0) command.append(":!aPSK");
+if (getRandomIntForFoo12Modern() == 0) command.append(":!kRSA");
+if (getRandomIntForFoo12Modern() == 0) command.append(":!ECDSA");
+if (getRandomIntForFoo12Modern() == 0) command.append(":!ECDSA+SHA1");
+if (getRandomIntForFoo12Modern() == 0) command.append(":!3DES");
+```
+
+> Như vậy, các thuật toán mã hóa đã được thay đổi ngẫu nhiên (thêm vào hoặc bớt đi).
+
+###### 4. Biên dịch lại:
+
+```bash
+ninja  -C  out/Default chrome
+```
+
+* Sau khi biên dịch xong, mỗi lần làm mới trang, dấu vân tay JA4 sẽ được thay đổi ngẫu nhiên.

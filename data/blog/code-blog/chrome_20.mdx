@@ -1,0 +1,126 @@
+---
+title: 'Biên dịch Chromedriver - Vượt qua kiểm tra robot SeleniumL'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+### 022. (附加) Biên dịch Chromedriver - Vượt qua kiểm tra robot Selenium
+
+Có một số bạn nói rằng sử dụng Selenium không thể vượt qua được kiểm tra robot, vì vậy mình sẽ hướng dẫn cách khắc phục.
+
+Selenium có hai phương pháp kiểm tra robot chính, một là kiểm tra CDP, và hai là kiểm tra đặc điểm WebDriver. Phương pháp kiểm tra CDP đã được đề cập trong blog trước, ở đây mình chỉ nói về kiểm tra đặc điểm WebDriver.
+
+### Một, Giới thiệu về Selenium
+
+- Selenium là một công cụ mạnh mẽ dùng để tự động hóa trình duyệt web, thường được sử dụng trong các công cụ thu thập dữ liệu (web scraping).
+- Tuy nhiên, Selenium cần phải thông qua WebDriver để điều khiển Chrome, và mỗi lần chạy Selenium, phải tìm đúng phiên bản của `chromedriver.exe`.
+- Việc tự động hóa bằng `chromedriver` sẽ thay đổi một số thuộc tính của trình duyệt, dễ dàng bị phát hiện là robot.
+- Pyppeteer không gặp phải vấn đề này vì không cần trung gian điều khiển, vì vậy mình vẫn khuyên các bạn dùng Pyppeteer. Tuy nhiên, nếu bạn đã viết rất nhiều mã với Selenium, thì vẫn nên biên dịch một trình điều khiển.
+
+### Hai, Các website kiểm tra robot
+
+1. [https://www.browserscan.net/bot-detection](https://www.browserscan.net/bot-detection)
+2. [https://fingerprintjs.github.io/BotD/main/](https://fingerprintjs.github.io/BotD/main/)
+
+> Rõ ràng là, các website thông thường có thể phát hiện ra Selenium là robot.
+
+### Ba, Nguyên lý phát hiện
+
+Đặt đoạn mã JavaScript dưới đây vào bảng điều khiển F12:
+
+```js
+// Định nghĩa biểu thức chính quy
+let regex = /^([a-z]){3}_.*_(Array|Promise|Symbol|JSON|Object|Proxy)$/;
+// Lấy tất cả các tên thuộc tính của đối tượng window
+let allProps = Object.getOwnPropertyNames(window);
+// Lọc ra những thuộc tính khớp với biểu thức chính quy
+let filteredProps = allProps.filter(prop => regex.test(prop));
+// In ra tên các thuộc tính khớp
+console.log(filteredProps);
+```
+
+- Trình duyệt bình thường sẽ in ra `[]`.
+- Trình duyệt được điều khiển bởi Selenium sẽ in ra danh sách các thuộc tính đặc trưng.
+
+> Đây là logic kiểm tra robot của hai website trên. Với Pyppeteer, không cần lo lắng vì không thể phát hiện được robot.
+
+### Bốn, Biên dịch `chromedriver.exe`
+
+- Mở tệp mã nguồn Chromium tại: `\chrome\test\chromedriver\chrome\devtools_client_impl.cc`
+
+#### 1. Tìm đoạn mã:
+
+```cpp
+std::string script =
+        "(function () {"
+        "window.cdc_adoQpoasnfa76pfcZLmcfl_Array = window.Array;"
+        "window.cdc_adoQpoasnfa76pfcZLmcfl_Object = window.Object;"
+        "window.cdc_adoQpoasnfa76pfcZLmcfl_Promise = window.Promise;"
+        "window.cdc_adoQpoasnfa76pfcZLmcfl_Proxy = window.Proxy;"
+        "window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol = window.Symbol;"
+        "window.cdc_adoQpoasnfa76pfcZLmcfl_JSON = window.JSON;"
+        "}) ();";
+    params.Set("source", script);
+```
+
+#### 2. Thay thế bằng:
+
+```cpp
+std::string script =
+        "(function () {"
+        //"window.cdc_adoQpoasnfa76pfcZLmcfl_Array = window.Array;"
+        //"window.cdc_adoQpoasnfa76pfcZLmcfl_Object = window.Object;"
+        //"window.cdc_adoQpoasnfa76pfcZLmcfl_Promise = window.Promise;"
+        //"window.cdc_adoQpoasnfa76pfcZLmcfl_Proxy = window.Proxy;"
+        //"window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol = window.Symbol;"
+        //"window.cdc_adoQpoasnfa76pfcZLmcfl_JSON = window.JSON;"
+        "}) ();";
+    params.Set("source", script);
+```
+
+#### 3. Biên dịch:
+
+```bash
+ninja  -C  out/Default chromedriver
+```
+
+> Sau khi biên dịch, tệp `chromedriver.exe` sẽ được tạo ra trong thư mục `out/Default`.
+
+### Năm, Kiểm tra
+
+- Lấy tệp `chromedriver.exe` đã biên dịch, chạy đoạn mã Python dưới đây:
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+import time
+
+# Chỉ định đường dẫn đến chromedriver
+s = Service(r"chromedriver.exe")  # Thay bằng đường dẫn thực tế
+
+# Khởi tạo các tùy chọn cho Chrome
+chrome_options = webdriver.ChromeOptions()
+chrome_options.binary_location = r"C:\Users\Administrator\AppData\Local\Chromium\Application\chrome.exe"  # Thay bằng đường dẫn Chrome thực tế
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--fingerprints=11111111")
+
+# Sử dụng đối tượng Service để khởi tạo driver
+driver = webdriver.Chrome(service=s, options=chrome_options)
+driver.delete_all_cookies()
+
+# Truy cập trang kiểm tra
+driver.get("https://fingerprintjs.github.io/BotD/main/")
+time.sleep(99999)
+```
+
+> Bạn sẽ thấy rằng mặc dù điều khiển tự động, website vẫn không thể phát hiện ra.
+
+### Sáu, Về sản phẩm hoàn chỉnh
+
+- Những bạn có khả năng nên tự chạy quy trình và biên dịch trình duyệt và driver của riêng mình.
+- Mình đã hoàn thành sản phẩm. Quá trình phát triển được ghi lại hoàn toàn trong blog. Nếu bạn lười biên dịch, có thể liên hệ mua phiên bản vĩnh viễn hoặc tải phiên bản dùng thử miễn phí trong 10 ngày.
+
+> Liên kết tải về:
+
+- `Phiên bản dùng thử 10 ngày`: [https://pan.baidu.com/s/1Gtn2Rgma2VtMPSf-5-lLMg?pwd=um4u](https://pan.baidu.com/s/1Gtn2Rgma2VtMPSf-5-lLMg?pwd=um4u)

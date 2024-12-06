@@ -1,0 +1,125 @@
+---
+title: 'Sửa đổi mã nguồn Chromium -Vượt qua kiểm tra CDP'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+Dưới đây là bản dịch sang tiếng Việt của nội dung bài viết:
+
+---
+
+
+#### I. Kiểm tra CDP là gì?
+
+* **Giao thức công cụ phát triển Chrome** (Chrome DevTools Protocol, gọi tắt là CDP) là một giao thức cho phép các công cụ và phần mềm bên ngoài tương tác với trình duyệt Chrome.
+* **Kiểm tra CDP** (`Chrome DevTools Protocol Detection`) là một phương pháp phổ biến để phát hiện bot. Thông thường, nó sử dụng công cụ phát triển của trình duyệt để kiểm tra tính năng hoặc tìm lỗi.
+* Mỗi khi bạn mở bảng điều khiển F12, hoặc sử dụng các công cụ tự động hóa như Selenium, Puppeteer để mở trang web, bạn sẽ bị nhận diện là bot. Điều này chủ yếu do có kiểm tra CDP.
+
+#### II. Nguyên lý kiểm tra CDP
+
+* Kiểm tra CDP chủ yếu sử dụng hàm `console.debug()` để thực hiện. Khi bạn mở bảng điều khiển console, `console.debug()` sẽ được gọi.
+* Khi hàm `console.debug()` được kích hoạt, ta có thể xác định rằng bạn đã mở bảng điều khiển F12.
+
+#### III. Mã nguồn thực hiện kiểm tra CDP
+
+* Tạo một tệp HTML, có thể đặt tên là `111.html`:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Phát hiện Giao thức công cụ phát triển Chrome</title>
+	<script>
+		function genNum(e) {
+			return 1000 * e.Math.random() | 0;
+		}
+		function catchCDP(e) {
+			if (e.chrome) {
+				var rng1 = 0;
+				var rng2 = 1;
+				var acc = rng1;
+				var result = false;
+				try {
+					var errObj = new e.Error();
+					var propertyDesc = {
+						configurable: false,
+						enumerable: false,
+						get: function () {
+							acc += rng2;
+							return '';
+						}
+					};
+					Object.defineProperty(errObj, "stack", propertyDesc);
+					console.debug(errObj);
+					errObj.stack;
+					if (rng1 + rng2 != acc) {
+						result = true;
+					}
+				} catch {
+
+				}
+				return result;
+			}
+		}
+		function isCDPOn() {
+			if(!window)
+				return;
+			const el = document.querySelector('span#status');
+			if(!el)
+				return;
+			el.innerText = catchCDP(window) ? "yes":"no";
+		}
+		function init() {
+			isCDPOn();
+			setInterval(isCDPOn, 100);
+		}
+		document.addEventListener("DOMContentLoaded", init);
+	</script>
+</head>
+<body>
+	<p>CDP Detected: <span id="status">-</span></p>
+</body>
+</html>
+```
+
+* Tệp HTML này rất hiệu quả, mỗi khi bạn mở F12 hoặc sử dụng công cụ tự động hóa như Selenium, Puppeteer để mở trang này, trang sẽ nhận diện bạn là bot.
+
+#### IV. Sửa đổi mã nguồn để vượt qua kiểm tra CDP
+
+* Bài viết đầu tiên đã hướng dẫn cách biên dịch Chromium, giả sử bạn đã biên dịch thành công.
+* Tìm mã nguồn: `\v8\src\inspector\v8-console.cc`
+
+###### 1. Tìm đoạn mã sau
+
+```cpp
+void V8Console::Debug(const v8::debug::ConsoleCallArguments& info,
+                      const v8::debug::ConsoleContext& consoleContext) {
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("v8.inspector"), "V8Console::Debug");
+  ConsoleHelper(info, consoleContext, m_inspector)
+      .reportCall(ConsoleAPIType::kDebug);
+}
+```
+
+###### 2. Thay thế bằng
+
+```cpp
+void V8Console::Debug(const v8::debug::ConsoleCallArguments& info,
+                      const v8::debug::ConsoleContext& consoleContext) {
+  //TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("v8.inspector"), "V8Console::Debug");
+  //ConsoleHelper(info, consoleContext, m_inspector)
+  //    .reportCall(ConsoleAPIType::kDebug);
+}
+```
+
+###### 3. Biên dịch lại
+
+```bash
+ninja  -C  out/Default chrome
+```
+
+#### V. Các trang web kiểm tra dấu vân tay trực tuyến:
+
+* https://fingerprint.com/products/bot-detection/
+* https://www.browserscan.net/bot-detection
+

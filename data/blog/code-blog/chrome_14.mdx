@@ -1,0 +1,212 @@
+---
+title: 'Sửa đổi mã nguồn Chromium - Sửa đổi dấu vân tay webGL (Phần 2)'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+Dưới đây là bản dịch tiếng Việt của bài viết "指纹浏览器开发-修改webGL指纹(二)":
+
+---
+
+**Phát triển trình duyệt nhận diện vân tay - Sửa đổi dấu vân tay webGL (Phần 2)**
+
+#### I. Dấu vân tay webGL là gì?
+
+* Trước đây đã giới thiệu dấu vân tay webGL và cách các trang web phổ biến vượt qua kiểm tra dấu vân tay webGL, [xem tại đây](https://blog.csdn.net/w1101662433/article/details/137962776).
+
+#### II. Tại sao có dấu vân tay webGL - Phần 2
+
+* Ở phần trước, chúng ta đã sửa đổi các tham số của gl, thay đổi thứ tự trong danh sách giá trị trả về của hàm `getSupportedExtensions()`, để vượt qua một số kiểm tra dấu vân tay của các trang web.
+* Tuy nhiên, một số trang web khác sử dụng webGL để tạo ra hình ảnh và thu thập dấu vân tay, và chúng ta cần tiếp tục sửa đổi.
+* Hơn nữa, kiểm tra dấu vân tay ở phần trước không thành công trên trang web browserscan.
+
+#### III. Lấy dấu vân tay webGL của trình duyệt (qua việc tạo hình ảnh)
+
+* Để hiểu được cách thức hoạt động, trước tiên hãy xem trang web thu thập dấu vân tay webGL bằng JavaScript như thế nào.
+* Sao chép mã dưới đây vào bảng điều khiển F12, và bạn sẽ thấy dấu vân tay webGL của mình:
+
+```javascript
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+function getWebGLFingerprint() {
+    var canvas = document.createElement('canvas');
+    var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    var vsSource = `
+        attribute vec4 aVertexPosition;
+        void main(void) {
+            gl_Position = aVertexPosition;
+        }
+    `;
+    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, vsSource);
+    gl.compileShader(vertexShader);
+
+    var fsSource = `
+        void main(void) {
+            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        }
+    `;
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, fsSource);
+    gl.compileShader(fragmentShader);
+
+    var shaderProgram = gl.createProgram();
+    gl.attachShader(shaderProgram, vertexShader);
+    gl.attachShader(shaderProgram, fragmentShader);
+    gl.linkProgram(shaderProgram);
+    gl.useProgram(shaderProgram);
+
+    var vertices = new Float32Array([0.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, -1.0, 0.0]);
+    var vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    var vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+    gl.enableVertexAttribArray(vertexPositionAttribute);
+    gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    var res = canvas.toDataURL();
+    return res;
+}
+
+sha256(getWebGLFingerprint()).then(hash => console.log(hash));
+```
+
+> Có thể thấy, có 2 cách để lấy dữ liệu hình ảnh, với các hàm quan trọng là `readPixels()` và `toDataURL()`.
+
+#### IV. Sửa đổi hàm `readPixels()` trong mã nguồn
+
+* Mở file mã nguồn `\third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc`.
+
+##### 1. Tìm đoạn mã sau:
+
+```cpp
+void WebGLRenderingContextBase::ReadPixelsHelper(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, DOMArrayBufferView* pixels, int64_t offset) {
+    if (isContextLost())
+        return;
+}
+```
+
+##### 2. Thay thế bằng:
+
+```cpp
+int getRandomIntForFoo12Modern() {
+    static std::mt19937 generator(static_cast<unsigned long>(time(NULL))); 
+    std::uniform_int_distribution<int> distribution(0, 9);
+    return distribution(generator);
+}
+
+void WebGLRenderingContextBase::ReadPixelsHelper(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, DOMArrayBufferView* pixels, int64_t offset) {
+    if (isContextLost())
+        return;
+
+    width = width - getRandomIntForFoo12Modern();
+    height = height - getRandomIntForFoo12Modern();
+}
+```
+
+> Lưu ý: Ở đây, chúng ta đã cắt giảm một số pixel để thay đổi giá trị trả về của phương thức `ReadPixelsHelper`.
+
+#### V. Sửa đổi hàm `toDataURL()` trong mã nguồn
+
+* Mở file mã nguồn `\third_party\blink\renderer\core\html\canvas\html_canvas_element.cc`.
+
+##### 1. Thêm vào đầu file (sau một `#include` bất kỳ):
+
+```cpp
+#include <algorithm> 
+#include <random>    
+#include <chrono>   
+```
+
+##### 2. Tìm đoạn mã sau:
+
+```cpp
+String HTMLCanvasElement::toDataURL(const String& mime_type, const ScriptValue& quality_argument, ExceptionState& exception_state) const {
+    if (ContextHasOpenLayers(context_)) {
+        exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError, "`toDataURL()` cannot be called with open layers.");
+        return String();
+    }
+
+    if (!OriginClean()) {
+        exception_state.ThrowSecurityError("Tainted canvases may not be exported.");
+        return String();
+    }
+
+    double quality = kUndefinedQualityValue;
+    if (!quality_argument.IsEmpty()) {
+        v8::Local<v8::Value> v8_value = quality_argument.V8Value();
+        if (v8_value->IsNumber())
+            quality = v8_value.As<v8::Number>()->Value();
+    }
+    
+    String data = ToDataURLInternal(mime_type, quality, kBackBuffer);
+    
+    TRACE_EVENT_INSTANT(TRACE_DISABLED_BY_DEFAULT("identifiability.high_entropy_api"), "CanvasReadback", "data_url", data.Utf8());
+    
+    return data;
+}
+```
+
+##### 3. Thay thế bằng:
+
+```cpp
+String HTMLCanvasElement::toDataURL(const String& mime_type, const ScriptValue& quality_argument, ExceptionState& exception_state) const {
+    if (ContextHasOpenLayers(context_)) {
+        exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError, "`toDataURL()` cannot be called with open layers.");
+        return String();
+    }
+
+    if (!OriginClean()) {
+        exception_state.ThrowSecurityError("Tainted canvases may not be exported.");
+        return String();
+    }
+
+    double quality = kUndefinedQualityValue;
+    if (!quality_argument.IsEmpty()) {
+        v8::Local<v8::Value> v8_value = quality_argument.V8Value();
+        if (v8_value->IsNumber())
+            quality = v8_value.As<v8::Number>()->Value();
+    }
+    
+    String data = ToDataURLInternal(mime_type, quality, kBackBuffer);
+    
+    TRACE_EVENT_INSTANT(TRACE_DISABLED_BY_DEFAULT("identifiability.high_entropy_api"), "CanvasReadback", "data_url", data.Utf8());
+    
+    std::srand(std::time(nullptr));
+    int randomNum = std::rand() % 100 + 1;
+    std::string spaces(randomNum, ' ');
+    data = data + String(spaces);
+    
+    return data;
+}
+```
+
+> Lưu ý: Dữ liệu trả về từ `toDataURL()` là chuỗi `base64`, và chúng ta thêm một số khoảng trắng ngẫu nhiên vào cuối chuỗi này. Điều này sẽ không ảnh hưởng đến chức năng của hàm nhưng sẽ làm thay đổi giá trị hash.
+
+##### 4. Biên dịch lại:
+
+```bash
+ninja -C out/Default chrome
+```
+
+> Nếu trang web browserscan biết được điều này, chắc chắn sẽ rất ngạc nhiên về cách chúng ta làm việc này~~
+
+#### VI. Các trang web kiểm tra dấu vân tay trực tuyến:
+
+* [https://abrahamjuliot.github.io/creepjs/](https://abrahamjuliot.github.io/creepjs/)
+* [https://www.browserscan.net/](https://www.browserscan.net/)
+
+--- 

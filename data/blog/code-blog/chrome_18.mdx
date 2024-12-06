@@ -1,0 +1,144 @@
+---
+title: 'Sửa đổi mã nguồn Chromium - Thay đổi UA, GPU, phiên bản nhỏ'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+**Tùy chỉnh dấu vân tay khi biên dịch Chromium - Thay đổi UA, GPU, phiên bản nhỏ**
+
+### Mục tiêu không thay đổi:
+
+*   **Mục tiêu 1:** Khi khởi động Chrome, truyền tham số `--fingerprints=123123123` (là một số nguyên dương), thì dấu vân tay sẽ cố định không thay đổi. Khi số nguyên thay đổi, sẽ nhận được một dấu vân tay mới.
+*   **Mục tiêu 2:** Khi khởi động Chrome mà không truyền tham số `--fingerprints`, thì mỗi yêu cầu truy cập sẽ tạo dấu vân tay ngẫu nhiên.
+
+### Lưu ý:
+
+*   Do tôi chấp nhận kiểu `int`, nên `--fingerprints` chỉ có thể truyền số nguyên và giá trị tối đa là 2,147,483,647.
+*   Bài viết này giả định bạn đã đọc qua các bài viết trước đây của tôi và đã rất quen thuộc với quy trình chỉnh sửa mã nguồn.
+
+#### 1. Thay đổi thông tin GPU
+
+Mở file `\third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc`.
+
+**1. Thêm vào đầu file:**
+```cpp
+#include "base/command_line.h"
+```
+
+**2. Tìm đoạn mã `case`:**
+```cpp
+case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
+```
+
+**3. Thay thế đoạn mã `return`:**
+```cpp
+case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
+    if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
+        if (IdentifiabilityStudySettings::Get()->ShouldSampleType(
+                blink::IdentifiableSurface::Type::kWebGLParameter)) {
+            RecordIdentifiableGLParameterDigest(
+                pname, IdentifiabilityBenignStringToken(
+                           String(ContextGL()->GetString(GL_RENDERER))));
+        }
+        base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+        int tmp;
+        if (base_command_line->HasSwitch("fingerprints")) {
+            std::istringstream(base_command_line->GetSwitchValueASCII("fingerprints")) >> tmp;
+        } else {
+            auto now = std::chrono::system_clock::now();
+            std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+            tmp = static_cast<int>(now_time_t);
+        }
+        std::string rstr_1 = std::to_string(tmp % 9);
+        std::string rstr_2 = std::to_string(tmp % 7);
+        return WebGLAny(script_state, String("ANGLE (NVIDIA, NVIDIA GeForce RTX 40" + rstr_1 + "0 Laptop GPU (0x000028A0) Direct3D11 vs_5_0 ps_5_" + rstr_2 + ", D3D11)"));
+    }
+    SynthesizeGLError(
+        GL_INVALID_ENUM, "getParameter",
+        "invalid parameter name, WEBGL_debug_renderer_info not enabled");
+    return ScriptValue::CreateNull(script_state->GetIsolate());
+```
+
+#### 2. Thay đổi UserAgent
+
+Mở file `‪/components/version_info/version_info_with_user_agent.cc`.
+
+**1. Thêm vào đầu file:**
+```cpp
+#include <string>
+#include <random> 
+#include "base/command_line.h"
+```
+
+**2. Tìm hàm sau:**
+```cpp
+std::string GetProductNameAndVersionForReducedUserAgent(
+    const std::string& build_version) {
+  return base::StrCat(
+      {"Chrome/", GetMajorVersionNumber(), ".0.", build_version, ".0"});
+}
+```
+
+**3. Thay thế hàm này bằng:**
+```cpp
+std::string GetProductNameAndVersionForReducedUserAgent(
+    const std::string& build_version) {
+        
+  base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+  std::string tmp = "";
+  if (base_command_line->HasSwitch("fingerprints")) {
+    tmp = " BigTom/" + base_command_line->GetSwitchValueASCII("fingerprints"); 
+  }
+
+  return base::StrCat(
+      {"Chrome/", GetMajorVersionNumber(), ".0.", build_version, ".0", tmp});
+}
+```
+
+> Nguyên lý: thêm một chuỗi ký tự ngẫu nhiên vào trong UserAgent.
+
+#### 3. Thay đổi phiên bản nhỏ của Kernel
+
+**1. Lấy phiên bản trình duyệt**
+
+Nguyên lý là thông qua `navigator.userAgentData` để lấy.
+
+Dán đoạn mã sau vào bảng điều khiển F12 để hiển thị phiên bản trình duyệt:
+```javascript
+data = await navigator.userAgentData.getHighEntropyValues(
+            ['platform', 'platformVersion', 'architecture', 'bitness', 'model', 'uaFullVersion'],
+        )
+console.debug(data)
+console.log(data)
+```
+
+**2. Tìm vị trí mã nguồn:**
+
+Mở file `\third_party\blink\renderer\core\frame\navigator_ua.cc`.
+
+```cpp
+ua_data->SetUAFullVersion(String::FromUTF8(metadata.full_version));
+```
+
+**3. Thay thế bằng:**
+```cpp
+base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+int randomNum;
+if (base_command_line->HasSwitch("fingerprints")) {
+    int tmp;
+    std::istringstream(base_command_line->GetSwitchValueASCII("fingerprints")) >> tmp;
+    randomNum = tmp % 99;
+} else {
+    srand((int)time(NULL));
+    randomNum = rand() % 99;
+}
+ua_data->SetUAFullVersion("124." + String(std::to_string(randomNum % 99)) + ".6572.0");
+```
+
+> Bằng cách này, phiên bản nhỏ của trình duyệt sẽ được tạo ngẫu nhiên.
+
+#### 4. Cảm nghĩ
+
+*   Ban đầu tôi muốn tạo dấu vân tay cho trình duyệt để tránh bị kiểm soát dấu vân tay từ Akamai. Thực ra, tính năng tùy chỉnh dấu vân tay đã hoàn thành mục tiêu ban đầu.
+*   Lý do tôi tiếp tục cập nhật nội dung mới là nhờ sự ủng hộ từ bạn, người đã cho tôi một lượt thích.

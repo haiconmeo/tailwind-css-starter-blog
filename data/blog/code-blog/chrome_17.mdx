@@ -1,0 +1,188 @@
+---
+title: 'Sửa đổi mã nguồn Chromium - Cố định tham số dấu vân tay (Phần 2)'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+**017. Trình duyệt với dấu vân tay tùy chỉnh - Cố định tham số dấu vân tay (Phần 2)**
+
+### Biên dịch dấu vân tay ngẫu nhiên cho Chromium - Cố định tham số dấu vân tay (Phần 2)
+
+#### Mục tiêu:
+
+* **Mục tiêu 1**: Khi khởi động Chrome với tham số `--fingerprints=123123123` (số nguyên dương), dấu vân tay sẽ cố định không thay đổi. Khi số nguyên này thay đổi, dấu vân tay mới sẽ được tạo ra.
+* **Mục tiêu 2**: Nếu không truyền tham số `--fingerprints` khi khởi động Chrome, thì mỗi dấu vân tay của các yêu cầu truy cập sẽ được tạo ra ngẫu nhiên.
+
+#### Những điểm cần lưu ý:
+
+* Cần xóa bỏ toàn bộ mã trước đây để tạo dấu vân tay ngẫu nhiên, và thay thế bằng mã mới.
+* Vì tham số nhận giá trị kiểu int, nên `--fingerprints` chỉ có thể nhận số nguyên và giá trị tối đa là 2,147,483,647.
+* Tôi giả định rằng các bạn đã xem qua blog trước đó của tôi, và đã quen với quy trình sửa mã nguồn.
+
+### I. Dấu vân tay font cố định
+
+> Trước đây, tôi phát hiện ra rằng có rất nhiều cách để kiểm tra dấu vân tay từ font, vì vậy tôi đã tạo ra một cách "lười biếng" để giải quyết tất cả.  
+> Cách "lười biếng" này là: ngẫu nhiên thay đổi font thành font khác. Tuy nhiên, việc này có thể làm thay đổi font hiển thị trên trang web. Các bạn có thể điều chỉnh tùy theo nhu cầu.
+
+Mở tệp: `\third_party\blink\renderer\core\css\css_font_family_value.cc`
+
+```cpp
+#include "base/command_line.h"
+
+// 1. Định nghĩa một hàm trích xuất ngẫu nhiên
+std::vector<std::string> randomlyRemoveElements(std::vector<std::string> arr, unsigned int seed) {
+    srand(seed);  // Thiết lập hạt giống cho bộ sinh số ngẫu nhiên
+    std::vector<std::string> result;  // Vector chứa kết quả cuối cùng
+    
+    for (const auto& item : arr) {
+        if (rand() % 2 == 0) {  // Ngẫu nhiên chọn xem có giữ lại phần tử hay không
+            result.push_back(item);
+        }
+    }
+    return result;
+}
+```
+
+2. Tìm hàm `CSSFontFamilyValue::Create`:
+
+```cpp
+CSSFontFamilyValue* CSSFontFamilyValue::Create(const AtomicString& family_name) {
+    if (family_name.IsNull()) {
+        return MakeGarbageCollected<CSSFontFamilyValue>(family_name);
+    }
+    CSSValuePool::FontFamilyValueCache::AddResult entry =
+        CssValuePool().GetFontFamilyCacheEntry(family_name);
+    if (!entry.stored_value->value) {
+        entry.stored_value->value =
+            MakeGarbageCollected<CSSFontFamilyValue>(family_name);
+    }
+    return entry.stored_value->value.Get();
+}
+```
+
+3. Thay thế mã trên bằng đoạn mã sau:
+
+```cpp
+CSSFontFamilyValue* CSSFontFamilyValue::Create(const AtomicString& family_name) {
+    // Thêm mã vào đây
+    base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+    std::string ignores = base_command_line->GetSwitchValueASCII("ignores"); 
+    if (ignores.find("fonts") == std::string::npos) {
+        std::vector<std::string> stringsArray = { "Lucida Sans", "Segoe UI", "Verdana", "Times New Roman", ...};  // Danh sách font
+        int seed;
+        if (base_command_line->HasSwitch("fingerprints")) {
+            std::istringstream(base_command_line->GetSwitchValueASCII("fingerprints")) >> seed; 
+        } else {
+            auto now = std::chrono::system_clock::now();
+            std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+            seed = static_cast<int>(now_time_t);
+        }
+        
+        std::string now_font_str = "";
+        AtomicString tmp_family_name("");
+        for (const std::string& font : stringsArray) {
+            tmp_family_name = AtomicString(String(font)); 
+            if (tmp_family_name == family_name) {
+                now_font_str = font;
+                break;
+            }
+        }
+        
+        AtomicString res_family("monospace"); 
+        auto modifiedArray = randomlyRemoveElements(stringsArray, seed);
+        if (std::find(modifiedArray.begin(), modifiedArray.end(), now_font_str) != modifiedArray.end()) {
+            return MakeGarbageCollected<CSSFontFamilyValue>(res_family);
+        }
+    }
+    // Mã gốc tiếp theo
+    if (family_name.IsNull()) {
+        return MakeGarbageCollected<CSSFontFamilyValue>(family_name);
+    }
+    CSSValuePool::FontFamilyValueCache::AddResult entry =
+        CssValuePool().GetFontFamilyCacheEntry(family_name);
+    if (!entry.stored_value->value) {
+        entry.stored_value->value =
+            MakeGarbageCollected<CSSFontFamilyValue>(family_name);
+    }
+    return entry.stored_value->value.Get();
+}
+```
+
+### II. Dấu vân tay audio cố định:
+
+Tìm tệp `/third_party/blink/renderer/modules/webaudio/offline_audio_context.cc`
+
+```cpp
+#include <random>
+#include "base/command_line.h"
+
+int getRandomIntForFoo6Modern() {
+    static std::mt19937 generator(static_cast<unsigned long>(time(NULL))); // Khởi tạo một lần
+    std::uniform_int_distribution<int> distribution(0, 99);
+    return distribution(generator);
+}
+
+OfflineAudioContext::OfflineAudioContext(LocalDOMWindow* window,
+                                         unsigned number_of_channels,
+                                         uint32_t number_of_frames,
+                                         float sample_rate,
+                                         ExceptionState& exception_state)
+    : BaseAudioContext(window, kOfflineContext),
+      total_render_frames_(number_of_frames) {
+
+    base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+    int tmp;
+    if (base_command_line->HasSwitch("fingerprints")) {
+        std::istringstream(base_command_line->GetSwitchValueASCII("fingerprints")) >> tmp;
+    } else {
+        tmp = getRandomIntForFoo6Modern();
+    }
+    tmp = tmp % 99;
+    destination_node_ = OfflineAudioDestinationNode::Create(
+        this, number_of_channels, number_of_frames , sample_rate + tmp);
+    Initialize();
+}
+```
+
+### III. Dấu vân tay webGL
+
+Tìm tệp `\third_party\blink\renderer\core\html\canvas\html_canvas_element.cc`
+
+```cpp
+#include "base/command_line.h"
+
+String HTMLCanvasElement::toDataURL(const String& mime_type,
+                                    const ScriptValue& quality_argument,
+                                    ExceptionState& exception_state) const {
+    if (ContextHasOpenLayers(context_)) {
+        exception_state.ThrowDOMException(
+            DOMExceptionCode::kInvalidStateError,
+            "`toDataURL()` cannot be called with open layers.");
+        return String();
+    }
+
+    if (!OriginClean()) {
+        exception_state.ThrowSecurityError("Tainted canvases may not be exported.");
+        return String();
+    }
+
+    double quality = kUndefinedQualityValue;
+    if (!quality_argument.IsEmpty()) {
+        v8::Local<v8::Value> v8_value = quality_argument.V8Value();
+        if (v8_value->IsNumber())
+            quality = v8_value.As<v8::Number>()->Value();
+    }
+
+    String data = ToDataURLInternal(mime_type, quality, kBackBuffer);
+
+    TRACE_EVENT_INSTANT(
+        TRACE_DISABLED_BY_DEFAULT("identifiability.high_entropy_api"),
+        "CanvasReadback", "data_url", data.Utf8());
+
+    // Thêm mã vào đây
+    base::CommandLine* base_command_line = base::CommandLine::ForCurrentProcess();
+    int tmp;
+    std::istringstream(base_command_line->...
+}
+```
