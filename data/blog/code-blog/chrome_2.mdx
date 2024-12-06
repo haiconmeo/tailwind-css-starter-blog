@@ -1,0 +1,170 @@
+---
+title: 'Sửa đổi mã nguồn Chromium để tạo Canvas Fingerprint ngẫu nhiên'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+002. Sửa đổi mã nguồn Chromium để tạo Canvas Fingerprint ngẫu nhiên
+=================================
+
+**Tác giả: [王辉辉的猫](https://blog.csdn.net/w1101662433)**
+
+---
+
+Bài viết này giới thiệu cách thu thập và tạo Canvas Fingerprint (dấu vân tay Canvas) bằng JavaScript, đồng thời cách thêm các yếu tố ngẫu nhiên để tăng tính ngẫu nhiên của dấu vân tay, ngăn chặn trang web theo dõi quá mức người dùng. Bằng cách chỉnh sửa mã nguồn của trình duyệt, người dùng có thể tạo ra các dấu vân tay khó dự đoán hơn, giúp bảo vệ quyền riêng tư.
+
+---
+
+### Tạo Canvas Fingerprint ngẫu nhiên thông qua mã nguồn
+
+#### 1. Canvas Fingerprint là gì?
+
+- Canvas Fingerprint là một kỹ thuật được sử dụng để theo dõi hành vi và nhận diện người dùng trên các trang web.
+- Trang web có thể yêu cầu trình duyệt tạo ra một canvas (bảng vẽ) ẩn, rồi vẽ hình ảnh, văn bản hoặc các yếu tố đồ họa khác trên đó.
+- Những hình ảnh này có thể khác nhau ở mức độ pixel rất nhỏ, cho phép trang web tạo ra một mã định danh duy nhất, hay còn gọi là "Canvas Fingerprint".
+
+#### 2. Cách thu thập Canvas Fingerprint của trình duyệt
+
+- Để phòng thủ, trước tiên chúng ta phải hiểu cách các trang web thu thập Canvas Fingerprint của bạn.
+- Sao chép đoạn mã sau vào bảng điều khiển (Console) của trình duyệt để xem Canvas Fingerprint của bạn:
+
+```javascript
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+function getCanvasFingerprint() {
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    
+    ctx.textBaseline = "top";
+    ctx.font = "14px 'Arial'";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#f60";
+    ctx.fillRect(125, 1, 62, 20);
+    
+    ctx.fillStyle = "#069";
+    ctx.fillText("Hello World!", 2, 15);
+    ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+    ctx.fillText("Hello World!", 4, 17);
+
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.beginPath();
+    ctx.lineTo(50, 100);
+    ctx.stroke();
+
+    var data = canvas.toDataURL();
+    return data;
+}
+
+sha256(getCanvasFingerprint()).then(hash => console.log(hash));
+```
+
+- Kết quả:
+
+```
+62a60d12f6688e2f53425fa4e35d74d2afd61d30e9e1bfe58e47c7abc72bc2d7
+```
+
+> Lưu ý: Ngay cả khi bạn đã thoát khỏi tài khoản của mình, nếu một trang web thu thập được Canvas Fingerprint của bạn, họ vẫn có thể nhận diện bạn.
+
+#### 3. Biên dịch mã nguồn Chromium để tạo Canvas Fingerprint ngẫu nhiên
+
+- Giả sử bạn đã biên dịch thành công Chromium (tham khảo bài viết trước về cách biên dịch).
+- Tìm mã nguồn tại: `\third_party\blink\renderer\modules\canvas\canvas2d\base_rendering_context_2d.cc`.
+
+##### 1. Thêm dòng mã sau (ở bất kỳ chỗ nào sau `#include`):
+
+```cpp
+#include <random>
+```
+
+##### 2. Thay thế đoạn mã gốc:
+
+```cpp
+void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
+  DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType);
+}
+
+void BaseRenderingContext2D::fillText(const String& text, double x, double y, double max_width) {
+  DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType, &max_width);
+}
+```
+
+##### Thay bằng đoạn mã sau:
+
+```cpp
+int getRandomIntForFoo4Modern() {
+    static std::mt19937 generator(static_cast<unsigned long>(time(NULL)));
+    std::uniform_int_distribution<int> distribution(0, 2);
+    return distribution(generator);
+}
+
+void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
+  x = x + getRandomIntForFoo4Modern();
+  y = y + getRandomIntForFoo4Modern();
+  DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType);
+}
+
+void BaseRenderingContext2D::fillText(const String& text, double x, double y, double max_width) {
+  x = x + getRandomIntForFoo4Modern();
+  y = y + getRandomIntForFoo4Modern();
+  DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType, &max_width);
+}
+```
+
+> Hàm `getRandomIntForFoo4Modern()` trả về một số ngẫu nhiên trong khoảng 0-2. Mỗi khi `fillText` được gọi, một giá trị ngẫu nhiên sẽ được thêm vào tọa độ x và y để tạo ra sự ngẫu nhiên.
+
+##### 3. Biên dịch
+
+```bash
+ninja -C out/Default chrome
+```
+
+- Sau khi biên dịch thành công, thực thi tệp `chrome.exe` trong thư mục `out/Default`.
+- Kiểm tra lại Canvas Fingerprint, bạn sẽ thấy mỗi lần truy cập đều có một dấu vân tay khác nhau.
+
+#### 4. Muốn ngẫu nhiên hơn?
+
+- Thay thế hàm `BaseRenderingContext2D::measureText` bằng đoạn mã sau:
+
+```cpp
+TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
+  HTMLCanvasElement* canvas = HostAsHTMLCanvasElement();
+  if (canvas) {
+    if (!canvas->GetDocument().GetFrame()) {
+      return MakeGarbageCollected<TextMetrics>();
+    }
+
+    canvas->GetDocument().UpdateStyleAndLayoutTreeForElement(canvas, DocumentUpdateReason::kCanvas);
+  }
+
+  const Font& font = AccessFont(canvas);
+  const CanvasRenderingContext2DState& state = GetState();
+  TextDirection direction = ToTextDirection(state.GetDirection(), canvas);
+  
+  int tmp = getRandomIntForFoo4Modern();
+  String tmp_text;
+  if (tmp == 0 && text.length() != 0) {
+    tmp_text = text + " ";
+  } else {
+    tmp_text = text;
+  }
+
+  return MakeGarbageCollected<TextMetrics>(font, direction, state.GetTextBaseline(), state.GetTextAlign(), tmp_text);
+}
+```
+
+> Đoạn mã này thêm một ký tự trống ngẫu nhiên vào văn bản mỗi khi render. Nhờ đó, mỗi lần đo lường canvas sẽ tạo ra kết quả khác nhau.
+
+#### 5. Trang web kiểm tra Canvas Fingerprint trực tuyến:
+
+- https://browserleaks.com/canvas
+- https://abrahamjuliot.github.io/creepjs/
+
+> Nếu có nhiều người quan tâm, mình sẽ viết thêm phần tiếp theo.

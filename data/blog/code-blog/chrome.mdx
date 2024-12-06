@@ -1,0 +1,123 @@
+---
+title: 'Biên dịch Chromium'
+date: '2024-12-06'
+tags: ['chrome', 'python', 'backend']
+draft: false
+summary: 
+---
+001. Biên dịch Chromium
+==============
+
+Tác giả: [王辉辉的猫](https://blog.csdn.net/w1101662433)  
+Lượt xem: 2.5k  
+Thích: 8  
+Lưu trữ: 15  
+Bài viết đầu tiên đăng ngày: 19-04-2024  
+Chỉnh sửa lần cuối: 15-08-2024
+
+---
+
+**Bài viết này sẽ hướng dẫn chi tiết cách biên dịch trình duyệt Chromium trên hệ điều hành Windows, bao gồm các yêu cầu hệ thống, cài đặt Visual Studio, Windows SDK, công cụ depot\_tools, thiết lập biến môi trường, tải mã nguồn từ Git và cuối cùng là quá trình xây dựng, biên dịch và tạo gói cài đặt.**
+
+> Lưu ý: Việc biên dịch Chromium rất tốn thời gian. Hãy luôn kiểm tra hướng dẫn chính thức để đảm bảo các bước cài đặt cập nhật nhất.
+
+**Liên kết hướng dẫn chính thức:**  
+[Chromium Windows Build Instructions](https://github.com/chromium/chromium/blob/main/docs/windows_build_instructions.md)
+
+### 1. Yêu cầu hệ thống
+
+- Máy tính 64-bit với bộ vi xử lý Intel và tối thiểu 8GB RAM (khuyến nghị 16GB trở lên).
+- Ổ đĩa NTFS với ít nhất 100GB dung lượng trống (một số gói Git có kích thước lớn hơn 4GB).
+- Phiên bản Visual Studio tương thích.
+- Hệ điều hành Windows 10 hoặc mới hơn.
+
+### 2. Cài đặt Visual Studio
+
+Cài đặt các thành phần cần thiết:
+
+- "Desktop development with C++"
+- "MFC/ATL support"
+
+Bạn có thể cài đặt từ dòng lệnh bằng cách sử dụng lệnh sau:
+
+```bash
+PATH_TO_INSTALLER.EXE ^
+--add Microsoft.VisualStudio.Workload.NativeDesktop ^
+--add Microsoft.VisualStudio.Component.VC.ATLMFC ^
+--includeRecommended
+```
+
+### 3. Cài đặt SDK
+
+- Cài đặt Windows 11 SDK version 10.0.22621.2428.
+- Đảm bảo công cụ Debugging Tools for Windows được cài đặt qua "Control Panel -> Programs -> Programs and Features" bằng cách chọn phiên bản SDK thích hợp.
+
+### 4. Cài đặt `depot_tools`
+
+- Tải `depot_tools` từ [depot_tools bundle](https://storage.googleapis.com/chrome-infra/depot_tools.zip) và giải nén vào thư mục như `C:\src\depot_tools`.
+
+### 5. Thiết lập biến môi trường
+
+- Thêm `C:\src\depot_tools` vào biến môi trường `PATH`.
+- Đặt biến `vs2022_install` thành đường dẫn cài đặt Visual Studio của bạn.
+
+### 6. Cài đặt proxy
+
+- Đặt proxy cho quá trình tải và biên dịch:
+
+```bash
+netsh winhttp set proxy http://127.0.0.1:10809 "<local>"
+set http_proxy=http://127.0.0.1:10809
+set https_proxy=http://127.0.0.1:10809
+```
+
+### 7. Tải mã nguồn từ Git
+
+- Thiết lập Git:
+
+```bash
+git config --global user.name "tên của bạn"
+git config --global user.email "email của bạn"
+git config --global core.autocrlf false
+git config --global core.filemode false
+git config --global branch.autosetuprebase always
+```
+
+- Tải mã nguồn Chromium:
+
+```bash
+mkdir chromium && cd chromium
+fetch --no-history chromium
+gclient sync
+```
+
+### 8. Xây dựng và biên dịch
+
+#### 1. Xây dựng
+
+```bash
+gn gen out\Default --args="is_component_build = false is_debug = false enable_nacl = false blink_symbol_level = 0 v8_symbol_level = 0 symbol_level = 0"
+```
+
+> Đây là cấu hình tối thiểu cho việc biên dịch.  
+> Lưu ý: Không bật `is_debug`, vì nó sẽ khiến Chromium chạy rất chậm.  
+> Lưu ý: Đừng bỏ bất kỳ khoảng trắng nào trong lệnh, nếu không sẽ xảy ra lỗi.
+
+#### 2. Biên dịch
+
+```bash
+ninja -C out/Default chrome
+```
+
+- Trong thư mục `out/Default` sẽ xuất hiện nhiều tệp, trong đó `chrome.exe` là tệp chạy trình duyệt.
+
+#### 3. Tạo gói cài đặt
+
+```bash
+ninja -C out/Default mini_installer
+```
+
+- Một tệp cài đặt `mini_installer.exe` sẽ được tạo trong thư mục `out/Default`.  
+- Gói cài đặt này sẽ tiến hành cài đặt âm thầm với đường dẫn mặc định là `C:\Users%USERNAME%\AppData\Local\Chromium`.
+
+> Lưu ý: Quá trình biên dịch rất chậm.
